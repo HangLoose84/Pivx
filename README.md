@@ -323,35 +323,115 @@ Este escenario se probó con tests automatizados en Docker (3 contenedores,
 
 ---
 
+## Alta Fidelidad y Evasion
+
+Pivx implementa mejoras de fidelidad de red que hacen los escaneos
+indistinguibles de conexiones nativas. Estas funciones se probaron en un
+laboratorio Docker (3 contenedores, 2 redes aisladas) con resultados
+verificados.
+
+### Smartping (ICMP a traves del tunel)
+
+A diferencia de otras herramientas de pivoting, Pivx soporta **ping real**
+a traves del tunel L3. El agente intercepta ICMP Echo Request, ejecuta un
+`ping` nativo del OS para verificar que el host esta vivo, y construye el
+Echo Reply con checksums correctos.
+
+```bash
+# Desde tu C2, con el tunel y la ruta activos:
+ping -c 2 10.10.20.100
+
+PING 10.10.20.100 (10.10.20.100) 56(84) bytes of data.
+64 bytes from 10.10.20.100: icmp_seq=1 ttl=64 time=5.03 ms
+64 bytes from 10.10.20.100: icmp_seq=2 ttl=64 time=2.88 ms
+
+--- 10.10.20.100 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+```
+
+Esto permite usar `nmap` **sin `-Pn`** para descubrimiento de hosts: los
+equipos que responden al ping aparecen como *up* y nmap escanea solo esos.
+
+### Magic IP (acceso al localhost de la victima)
+
+El rango reservado `240.0.0.0/4` (Class-E) se reescribe a `127.0.0.1` del
+agente, tanto en el tunel L3 como via SOCKS5/MUX. Esto permite acceder a
+servicios que solo escuchan en localhost (bases de datos, paneles admin,
+APIs internas) sin conflictos de IP:
+
+```bash
+# Via SOCKS5 — accede al servidor HTTP oculto en localhost:8080 del agente:
+curl --socks5-hostname 127.0.0.1:1080 http://240.0.0.1:8080/
+
+# Respuesta: directory listing del filesystem del agente
+<!DOCTYPE HTML>
+<html lang="en">
+<head><title>Directory listing for /</title></head>
+...
+```
+
+Cualquier IP del rango `240.x.x.x` funciona: `240.0.0.1`, `240.1.2.3`, etc.
+Todas se redirigen al `127.0.0.1` del agente.
+
+### Escaneos SYN fieles (SYN-Cookies desactivadas)
+
+Pivx desactiva las SYN-Cookies del netstack gVisor, evitando que el
+netstack responda SYN-ACK a **todo** SYN sin crear estado. Sin esta
+correccion, `nmap -sS` mostraria todos los puertos como *open*. Con ella,
+solo los puertos realmente abiertos responden.
+
+### RST inteligente
+
+Cuando el agente intenta conectar a un puerto cerrado y recibe
+`ECONNREFUSED`, devuelve un RST al escaner. Si el destino no responde
+(timeout), no envia nada. Esto permite a nmap distinguir correctamente
+entre puertos *closed* (RST) y *filtered* (sin respuesta).
+
+### Kill Switch (terminacion remota del agente)
+
+Desde el dashboard del C2, un clic en el boton Kill envia `{"type":"kill"}`
+al agente, que ejecuta `os.Exit(0)` inmediatamente. La conexion WebSocket
+se cierra y el dashboard refleja el cambio al instante.
+
+### Resultados del test automatizado
+
+| Test | Resultado | Detalle |
+|------|-----------|---------|
+| Smartping L3 (ping via tunel) | PASADO | 2/2 replies, ~4ms RTT |
+| Magic IP L7 (240.0.0.1:8080 via SOCKS5) | PASADO | HTTP 200, directory listing |
+| Kill Switch (os.Exit remoto) | PASADO | Desconexion en <1s |
+
+---
+
 ## Limitaciones conocidas / Tips de uso
 
 Léelo antes de escanear: evita perder tiempo persiguiendo "hosts caídos" que en
 realidad sí están vivos.
 
-### ⚠️ No hay ICMP a través del túnel — usa `nmap -sT -Pn`
+### ICMP Smartping — `ping` funciona a traves del tunel
 
-El plano de datos solo reconstruye **TCP y UDP** en *userland* (el netstack del
-agente tiene forwarders TCP/UDP, pero **no** un proxy ICMP). Consecuencias:
+Pivx soporta **ping real** via el tunel L3 (ver seccion *Alta Fidelidad*).
+El agente intercepta ICMP Echo Request, verifica el host con un ping del OS,
+y responde con Echo Reply. Esto significa que **nmap puede descubrir hosts con
+ICMP** sin necesidad de `-Pn` en la mayoria de redes.
 
-- **`ping 10.10.20.5` no funciona** a través de `pivx0`, aunque el host exista.
-- El **descubrimiento de hosts por defecto de nmap usa ICMP/ARP**, que no cruzan
-  el túnel. Sin desactivarlo, nmap marcará los equipos como *down* y no los
-  escaneará.
-
-**Regla práctica — usa siempre estas dos flags:**
+**Modos de escaneo soportados:**
 
 ```bash
-nmap -sT -Pn 10.10.20.0/24
+# Descubrimiento con ping (funciona gracias al Smartping):
+nmap -sn 10.10.20.0/24
+
+# SYN scan — el netstack procesa SYN a nivel de transporte y responde
+# RST (cerrado) o SYN-ACK (abierto) segun el estado real del puerto:
+nmap -sS 10.10.20.0/24
+
+# TCP connect sigue funcionando como siempre:
+nmap -sT 10.10.20.0/24
 ```
 
-- `-sT` → **TCP connect scan**. El proxy trabaja a nivel de socket, no reenvía
-  paquetes SYN crudos; un SYN-scan (`-sS`) no funcionará.
-- `-Pn` → **omite el descubrimiento de host** (asume que todos están vivos y va
-  directo al escaneo de puertos). Sin esto, los equipos internos "parecerán
-  caídos" y nmap los saltará. **Es obligatorio con Pivx.**
-
-> Para acotar el escaneo (dado que se prueban todos los hosts), limita puertos:
-> `nmap -sT -Pn -p 22,80,139,443,445,3389 10.10.20.0/24`.
+> **Nota:** El Smartping ejecuta un `ping` real por cada Echo Request, lo que
+> anade ~3-5ms de latencia. Para escaneos masivos, `-Pn` sigue siendo mas
+> rapido porque omite la fase de descubrimiento.
 
 ### Otras limitaciones actuales
 
