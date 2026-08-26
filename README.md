@@ -1,8 +1,7 @@
 [English](README.md) | [Español](docs/README_es.md) | [Português](docs/README_pt.md) | [中文](docs/README_zh.md)
 
 <div align="center">
-  <img src="assets/logo.svg" alt="Pivx Logo" width="120">
-  <h1>Pivx</h1>
+  <img src="assets/logo.svg" alt="Pivx" width="220">
   <p><em>High Fidelity Hybrid Framing C2 &amp; Pivoting Suite</em></p>
   <br>
 

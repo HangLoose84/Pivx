@@ -1,21 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <defs>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#00d4aa"/>
-      <stop offset="100%" stop-color="#0099cc"/>
-    </linearGradient>
-  </defs>
-  <!-- Shield -->
-  <path d="M64 4 L122 28 V84 Q122 122 64 124 Q6 122 6 84 V28 Z"
-        fill="#0d1117" stroke="url(#accent)" stroke-width="2.5"/>
-  <!-- Tunnel perspective rings -->
-  <ellipse cx="64" cy="56" rx="42" ry="34" fill="none" stroke="#00d4aa" stroke-width="1.5" opacity="0.15"/>
-  <ellipse cx="64" cy="56" rx="30" ry="24" fill="none" stroke="#00d4aa" stroke-width="1.5" opacity="0.3"/>
-  <ellipse cx="64" cy="56" rx="18" ry="14" fill="none" stroke="#00d4aa" stroke-width="1.5" opacity="0.5"/>
-  <!-- Pivot node -->
-  <circle cx="64" cy="56" r="6" fill="url(#accent)"/>
-  <circle cx="64" cy="56" r="2.5" fill="#0d1117"/>
-  <!-- Forward arrow -->
-  <path d="M42 96 L78 96" stroke="url(#accent)" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M76 90 L86 96 L76 102" fill="none" stroke="url(#accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" width="200">
+  <circle cx="50" cy="50" r="48" fill="#111111" stroke="#ff4444" stroke-width="2"/>
+  <path d="M 30 50 L 70 50 M 55 35 L 70 50 L 55 65" stroke="#ff4444" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="20" cy="50" r="4" fill="#ff4444"/>
+  <text x="50" y="122" text-anchor="middle" fill="#ff4444" font-family="'Courier New',monospace" font-weight="bold" font-size="30" letter-spacing="6">PIVX</text>
 </svg>

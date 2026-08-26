@@ -1,8 +1,7 @@
 [English](../README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
 
 <div align="center">
-  <img src="../assets/logo.svg" alt="Pivx Logo" width="120">
-  <h1>Pivx</h1>
+  <img src="../assets/logo.svg" alt="Pivx" width="220">
   <p><em>高保真混合帧 C2 跳板套件</em></p>
   <br>
 
