@@ -231,6 +231,21 @@ if agents_df.empty:
 else:
     st.dataframe(agents_df, use_container_width=True, hide_index=True)
 
+    if online_ids:
+        st.caption("Kill remoto (el agente ejecuta os.Exit):")
+        kill_cols = st.columns(min(len(online_ids), 4))
+        for i, aid in enumerate(online_ids):
+            short = aid[:8]
+            if kill_cols[i % len(kill_cols)].button(
+                f"💀 Kill {short}…", key=f"kill_{aid}", type="primary"
+            ):
+                try:
+                    runtime.kill_agent(aid)
+                    st.success(f"Kill enviado a `{short}…`")
+                    st.rerun()
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"Error: {e}")
+
 # --- Log de eventos -------------------------------------------------------
 st.subheader("📜 Log de conexiones")
 logs_df = db.get_logs_df(limit=200)

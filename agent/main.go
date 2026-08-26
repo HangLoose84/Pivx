@@ -29,6 +29,7 @@ const (
 	MsgPing     MessageType = "ping"
 	MsgPong     MessageType = "pong"
 	MsgAck      MessageType = "ack"
+	MsgKill     MessageType = "kill"
 )
 
 // ControlMessage es el sobre comun del plano de control (frames de texto).
@@ -188,7 +189,10 @@ func runSession(serverURL, agentID, hostname string, pingInterval time.Duration)
 			if mux.HandleControl(msg) {
 				continue
 			}
-			_ = msg
+			if msg.Type == MsgKill {
+				log.Printf("[!] Kill recibido del C2. Terminando agente.")
+				os.Exit(0)
+			}
 		}
 	}()
 

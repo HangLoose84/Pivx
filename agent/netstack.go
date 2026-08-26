@@ -15,12 +15,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"gvisor.dev/gvisor/pkg/buffer"
@@ -84,6 +86,12 @@ func NewNetStack(sendToTunnel func([]byte)) (*NetStack, error) {
 		{Destination: header.IPv6EmptySubnet, NIC: nicID},
 	})
 
+	// Deshabilitar SYN-Cookies: con cookies activas gVisor responde SYN-ACK a
+	// TODO SYN sin crear estado, lo que confunde a nmap (todos los puertos
+	// aparecen "open"). Sin ellas los escaneos SYN (-sS) dan resultados fieles.
+	synCookies := tcpip.TCPAlwaysUseSynCookies(false)
+	s.SetTransportProtocolOption(tcp.ProtocolNumber, &synCookies)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	ns := &NetStack{
 		stack:        s,
@@ -101,8 +109,14 @@ func NewNetStack(sendToTunnel func([]byte)) (*NetStack, error) {
 }
 
 // InjectInbound recibe un paquete IP crudo desde el tunel y lo inyecta en la pila.
+// Los ICMP Echo Request se interceptan aqui para el smartping (verificacion real
+// via OS antes de responder) en lugar de dejar que gVisor responda ciegamente.
 func (ns *NetStack) InjectInbound(raw []byte) {
 	if len(raw) == 0 {
+		return
+	}
+	if isICMPEchoRequest(raw) {
+		go ns.handleICMPEcho(raw)
 		return
 	}
 	var proto tcpip.NetworkProtocolNumber
@@ -142,18 +156,50 @@ func (ns *NetStack) Close() {
 	ns.stack.Close()
 }
 
+// magicIPNet es el rango Class-E 240.0.0.0/4 (reservado). Las conexiones a IPs
+// de este rango se redirigen a 127.0.0.1 del agente, permitiendo acceder a
+// servicios que solo escuchan en localhost (DBs, APIs internas, paneles admin)
+// sin conflictos de IP.
+var magicIPNet = net.IPNet{
+	IP:   net.IPv4(240, 0, 0, 0),
+	Mask: net.CIDRMask(4, 32),
+}
+
+// rewriteMagicIP devuelve "127.0.0.1" si addr pertenece a 240.0.0.0/4;
+// de lo contrario devuelve addr sin cambios.
+func rewriteMagicIP(addr string) string {
+	ip := net.ParseIP(addr)
+	if ip != nil && magicIPNet.Contains(ip) {
+		return "127.0.0.1"
+	}
+	return addr
+}
+
+// hostResponded indica si el error de Dial implica que el host remoto respondio
+// activamente (connection refused = puerto cerrado). En ese caso el netstack
+// debe devolver RST. Para timeouts/unreachable no se envia RST (equivale a
+// "filtered" en nmap).
+func hostResponded(err error) bool {
+	var serr syscall.Errno
+	if errors.As(err, &serr) {
+		return serr == syscall.ECONNREFUSED
+	}
+	return false
+}
+
 // --- TCP ------------------------------------------------------------------
 
 func (ns *NetStack) setupTCPForwarder() {
 	fwd := tcp.NewForwarder(ns.stack, 0, 2048, func(r *tcp.ForwarderRequest) {
 		id := r.ID()
-		dst := net.JoinHostPort(id.LocalAddress.String(), strconv.Itoa(int(id.LocalPort)))
+		host := rewriteMagicIP(id.LocalAddress.String())
+		dst := net.JoinHostPort(host, strconv.Itoa(int(id.LocalPort)))
 
-		// Conectamos primero al destino real; si falla, enviamos RST.
 		outbound, err := net.DialTimeout("tcp", dst, dialTO)
 		if err != nil {
-			log.Printf("[tcp] destino inalcanzable %s: %v", dst, err)
-			r.Complete(true) // true => enviar RST
+			rst := hostResponded(err)
+			log.Printf("[tcp] destino inalcanzable %s: %v (RST=%v)", dst, err, rst)
+			r.Complete(rst)
 			return
 		}
 
@@ -178,7 +224,8 @@ func (ns *NetStack) setupTCPForwarder() {
 func (ns *NetStack) setupUDPForwarder() {
 	fwd := udp.NewForwarder(ns.stack, func(r *udp.ForwarderRequest) bool {
 		id := r.ID()
-		dst := net.JoinHostPort(id.LocalAddress.String(), strconv.Itoa(int(id.LocalPort)))
+		host := rewriteMagicIP(id.LocalAddress.String())
+		dst := net.JoinHostPort(host, strconv.Itoa(int(id.LocalPort)))
 
 		var wq waiter.Queue
 		gep, err := r.CreateEndpoint(&wq)
@@ -193,10 +240,62 @@ func (ns *NetStack) setupUDPForwarder() {
 			return true
 		}
 		log.Printf("[udp] proxy establecido -> %s", dst)
-		go pipeUDP(inbound, outbound)
+		go ns.pipeUDPWithUnreachable(inbound, outbound, id)
 		return true
 	})
 	ns.stack.SetTransportProtocolHandler(udp.ProtocolNumber, fwd.HandlePacket)
+}
+
+// pipeUDPWithUnreachable es como pipeUDP pero detecta ECONNREFUSED en el lado
+// outbound (red real) e inyecta ICMP Port Unreachable de vuelta al tunel.
+func (ns *NetStack) pipeUDPWithUnreachable(inbound, outbound net.Conn, id stack.TransportEndpointID) {
+	defer inbound.Close()
+	defer outbound.Close()
+	done := make(chan struct{}, 2)
+
+	// outbound -> inbound (respuestas de la red real)
+	go func() {
+		buf := make([]byte, 65535)
+		for {
+			_ = outbound.SetReadDeadline(time.Now().Add(udpIdle))
+			n, err := outbound.Read(buf)
+			if n > 0 {
+				if _, werr := inbound.Write(buf[:n]); werr != nil {
+					break
+				}
+			}
+			if err != nil {
+				if hostResponded(err) {
+					ns.injectUDPPortUnreachable(id)
+				}
+				break
+			}
+		}
+		done <- struct{}{}
+	}()
+
+	// inbound -> outbound (peticiones hacia la red real)
+	go func() {
+		buf := make([]byte, 65535)
+		for {
+			_ = inbound.SetReadDeadline(time.Now().Add(udpIdle))
+			n, err := inbound.Read(buf)
+			if n > 0 {
+				if _, werr := outbound.Write(buf[:n]); werr != nil {
+					if hostResponded(werr) {
+						ns.injectUDPPortUnreachable(id)
+					}
+					break
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+		done <- struct{}{}
+	}()
+
+	<-done
 }
 
 // --- helpers de proxy -----------------------------------------------------

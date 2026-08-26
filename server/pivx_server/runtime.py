@@ -250,3 +250,23 @@ def del_route(cidr: str) -> None:
         tun.del_route(cidr)
     _state.routes.discard(cidr)
     db.remove_route(cidr)
+
+
+def kill_agent(agent_id: str) -> None:
+    """Envia el comando kill al agente y limpia su sesion."""
+    import json as _json
+
+    sess = _state.sessions.get(agent_id)
+    if sess is None:
+        raise RuntimeError("Agente no conectado.")
+
+    async def _send_kill() -> None:
+        try:
+            await sess.websocket.send(
+                _json.dumps({"type": "kill", "agent_id": agent_id})
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    _run_on_loop(_send_kill())
+    db.log_event(agent_id, "killed", "kill remoto desde dashboard")
