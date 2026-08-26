@@ -1,0 +1,10 @@
+# Pivx Server - dependencias (Fase 1 MVP)
+streamlit>=1.36
+websockets>=12.0
+duckdb>=1.0
+
+# Auto-refresco del dashboard sin recargar manualmente
+streamlit-autorefresh>=1.0.1
+
+# Utilidades
+pandas>=2.0

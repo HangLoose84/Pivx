@@ -1,0 +1,19 @@
+# Python
+server/.venv/
+__pycache__/
+*.pyc
+
+# DuckDB (estado local del C2)
+*.duckdb
+*.duckdb.wal
+
+# Go
+agent/pivx-agent
+agent/pivx-agent.exe
+/pivx-agent
+*.exe
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
