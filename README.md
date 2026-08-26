@@ -7,7 +7,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-[English](README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
+[English](README.md) | [Español](docs/README_es.md) | [Português](docs/README_pt.md) | [中文](docs/README_zh.md)
 
 **Network pivoting and routing tool for authorized penetration testing.**
 Pivx uses a **Hybrid Framing** architecture that multiplexes **L3 tunneling,

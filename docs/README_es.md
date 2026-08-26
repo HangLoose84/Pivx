@@ -5,9 +5,9 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](../LICENSE)
 
-[English](README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
+[English](../README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
 
 **Herramienta de pivoting y enrutamiento de red para pruebas de penetración autorizadas.**
 Pivx utiliza una arquitectura de **Framing Híbrido** que multiplexa **túneles L3,
@@ -15,7 +15,7 @@ port forwarding L4 y SOCKS5 L7** sobre una única conexión WebSocket con
 **latencia ultrabaja** — sin cabeceras de framing adicionales, sin conexiones secundarias.
 
 > **Estado actual (Fase 3):** suite completa de pivoting para CTF y pentesting.
-> Consulta [`ARCHITECTURE.md`](ARCHITECTURE.md) para el diseño completo.
+> Consulta [`ARCHITECTURE.md`](../ARCHITECTURE.md) para el diseño completo.
 
 ---
 
@@ -377,4 +377,4 @@ nmap -sT 10.10.20.0/24          # Escaneo TCP connect (siempre funciona)
 
 ## 📄 Licencia
 
-Este proyecto está licenciado bajo la **Licencia Pública General de GNU v3.0**. Consulta el archivo [LICENSE](LICENSE) para el texto completo.
+Este proyecto está licenciado bajo la **Licencia Pública General de GNU v3.0**. Consulta el archivo [LICENSE](../LICENSE) para el texto completo.

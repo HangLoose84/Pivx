@@ -1,5 +1,7 @@
 [English](TUTORIAL.md) | [Español](TUTORIAL_es.md) | [Português](TUTORIAL_pt.md) | [中文](TUTORIAL_zh.md)
 
+[← Voltar ao README](../README.md)
+
 # 🎮 Guia Rápido: Pivx para Iniciantes
 
 ## O que é o Pivx?

@@ -5,15 +5,15 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](../LICENSE)
 
-[English](README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
+[English](../README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
 
 **用于授权渗透测试的网络跳板与路由工具。**
 Pivx 采用**混合帧（Hybrid Framing）**架构，在单条 WebSocket 连接上复用 **L3 隧道、L4 端口转发和 L7 SOCKS5**，实现**超低延迟** —— 无额外帧头开销，无需建立辅助连接。
 
 > **当前状态（Phase 3）：**完整的跳板套件，适用于 CTF 和渗透测试。
-> 完整设计详见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+> 完整设计详见 [`ARCHITECTURE.md`](../ARCHITECTURE.md)。
 
 ---
 
@@ -375,4 +375,4 @@ nmap -sT 10.10.20.0/24          # TCP 全连接扫描（始终可用）
 
 ## 📄 许可证
 
-本项目基于 **GNU 通用公共许可证 v3.0** 发布。完整许可证文本请参阅 [LICENSE](LICENSE) 文件。
+本项目基于 **GNU 通用公共许可证 v3.0** 发布。完整许可证文本请参阅 [LICENSE](../LICENSE) 文件。
