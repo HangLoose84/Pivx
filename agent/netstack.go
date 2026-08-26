@@ -176,24 +176,25 @@ func (ns *NetStack) setupTCPForwarder() {
 // --- UDP ------------------------------------------------------------------
 
 func (ns *NetStack) setupUDPForwarder() {
-	fwd := udp.NewForwarder(ns.stack, func(r *udp.ForwarderRequest) {
+	fwd := udp.NewForwarder(ns.stack, func(r *udp.ForwarderRequest) bool {
 		id := r.ID()
 		dst := net.JoinHostPort(id.LocalAddress.String(), strconv.Itoa(int(id.LocalPort)))
 
 		var wq waiter.Queue
 		gep, err := r.CreateEndpoint(&wq)
 		if err != nil {
-			return
+			return true
 		}
 		inbound := gonet.NewUDPConn(&wq, gep)
 
 		outbound, derr := net.Dial("udp", dst)
 		if derr != nil {
 			inbound.Close()
-			return
+			return true
 		}
 		log.Printf("[udp] proxy establecido -> %s", dst)
 		go pipeUDP(inbound, outbound)
+		return true
 	})
 	ns.stack.SetTransportProtocolHandler(udp.ProtocolNumber, fwd.HandlePacket)
 }

@@ -1,6 +1,6 @@
 module github.com/pivx/agent
 
-go 1.22
+go 1.26.3
 
 // NOTA (Fase 2): gVisor se obtiene de su rama especial `go`, pensada para
 // consumirse como modulo. Ejecuta UNA vez, antes de compilar:
@@ -14,4 +14,13 @@ go 1.22
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+)
+
+require gvisor.dev/gvisor v0.0.0-20260825220317-3842c8232d20
+
+require (
+	github.com/google/btree v1.1.2 // indirect
+	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 )
