@@ -7,10 +7,11 @@ __pycache__/
 *.duckdb
 *.duckdb.wal
 
-# Go
+# Go / build output
 agent/pivx-agent
 agent/pivx-agent.exe
 /pivx-agent
+dist/
 *.exe
 
 # Editor / SO

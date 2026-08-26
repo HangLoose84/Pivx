@@ -7,7 +7,7 @@
 // proxy en ambos sentidos. Las respuestas vuelven como paquetes IP hacia el tunel.
 //
 // Esto es lo que permite pivotar sin privilegios ni driver en el target: toda la
-// "magia" de red ocurre en espacio de usuario. Mismo enfoque que Ligolo-ng.
+// "magia" de red ocurre en espacio de usuario.
 //
 // AVISO: la API de gVisor es sensible a la version. Este codigo se escribio contra
 // la rama `go` de gVisor. Ver README (go get gvisor.dev/gvisor@go && go mod tidy).

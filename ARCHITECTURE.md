@@ -1,8 +1,7 @@
 # Arquitectura de Pivx
 
-> Herramienta de pivoting y enrutamiento de red. Objetivo: superar la usabilidad
-> de Ligolo-ng mediante **automatización del enrutamiento** y una **UX** de
-> primera clase (dashboard web desde el día 1).
+> Herramienta de pivoting y enrutamiento de red con **automatización del
+> enrutamiento** y una **UX** de primera clase (dashboard web desde el día 1).
 
 Este documento describe la arquitectura. La **Fase 1** implementó el **plano de
 control** (registro, estado, keep-alive); la **Fase 2** el **plano de datos L3**
@@ -159,7 +158,7 @@ la Fase 5.
 
 - El **agente NO necesita privilegios de root/TUN**: reconstruye las conexiones
   en *userland* (abre sockets TCP/UDP reales hacia el destino interno), igual que
-  el enfoque de Ligolo-ng. Esto simplifica el despliegue en el target.
+  un enfoque de networking en userland. Esto simplifica el despliegue en el target.
 - El **servidor sí** requiere privilegios para crear la TUN y añadir rutas.
 
 ### 4.3 Optimización del data-plane (Fase 3)
@@ -181,7 +180,7 @@ la Fase 5.
 ## 4bis. Plano de streams: port-forwarding L4 y SOCKS5 L7 (Fase 3)
 
 Además del túnel L3, Pivx multiplexa **streams TCP** sobre la misma conexión
-(canal MUX, ver arriba). Es lo que Ligolo-ng resuelve con *listeners*; aquí se
+(canal MUX, ver arriba). Todo se
 unifica en una sola abstracción de stream con tres consumidores:
 
 - **Local forward (`-L`).** El **servidor** abre un listener (p. ej.
@@ -224,7 +223,7 @@ sus streams/forwards se liberan al desconectarse.
 
 ## 5. Automatización del enrutamiento (el diferenciador — Fase 5)
 
-Donde Ligolo-ng exige pasos manuales, Pivx busca **automatizar**. Estado actual:
+Pivx busca **automatizar** el enrutamiento. Estado actual:
 
 1. **Descubrimiento** ✅ — Al registrarse, el agente reporta sus interfaces y
    subredes conectadas (excluyendo la del uplink al C2, anti-suicidio). El

