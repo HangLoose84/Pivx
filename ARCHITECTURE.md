@@ -185,6 +185,13 @@ adicionales. Es la opción recomendada cuando el ancho de banda al target es
 limitado (CTFs, conexiones inestables, exfiltración por canales estrechos). Si un
 antivirus en el target flagea la firma UPX, se recurre al binario normal.
 
+> **Nota de compatibilidad Wine/Go:** al ejecutar el agente Windows (`.exe`) en
+> entornos de análisis Linux con Wine (versión 8.0 o inferior), la ejecución
+> fallará con `bcryptprimitives.dll not found`. Esto no es un defecto de UPX ni
+> del agente — el runtime de Go (1.21+) requiere esta DLL criptográfica de
+> Windows que versiones antiguas de Wine no implementan. En Windows nativo el
+> agente funciona sin problemas.
+
 ---
 
 ## 4bis. Plano de streams: port-forwarding L4 y SOCKS5 L7 (Fase 3)

@@ -1,13 +1,19 @@
-# Pivx 🕸️
-
-![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](../LICENSE)
-
 [English](../README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
+
+<div align="center">
+  <img src="../assets/logo.svg" alt="Pivx Logo" width="120">
+  <h1>Pivx</h1>
+  <p><em>Suite C2 de Alta Fidelidad con Framing Híbrido &amp; Pivoting</em></p>
+  <br>
+
+  ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
+  ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+  ![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
+  ![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
+  ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
+  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](../LICENSE)
+
+</div>
 
 **Herramienta de pivoting y enrutamiento de red para pruebas de penetración autorizadas.**
 Pivx utiliza una arquitectura de **Framing Híbrido** que multiplexa **túneles L3,
@@ -190,6 +196,8 @@ make windows-amd64-upx # -> dist/pivx-agent-windows-amd64-upx.exe
 
 > **Consejo:** Usa la variante UPX por defecto para subidas más rápidas. Recurre al binario normal solo si un antivirus detecta el empaquetado UPX. Requiere `upx` instalado en la máquina de compilación (`apt install upx` / `brew install upx`).
 
+> **Solución de problemas — Compatibilidad Wine/Go:** Ejecutar el agente de Windows (`.exe`) en entornos de análisis basados en Linux utilizando Wine (versión 8.0 o inferior) fallará con un error de `bcryptprimitives.dll`. Esto no es un fallo de UPX ni del agente — es una incompatibilidad conocida porque el runtime de Go (versión 1.21+) requiere esta DLL criptográfica de Windows que versiones antiguas de Wine no implementan. En sistemas Windows nativos, el agente funciona perfectamente.
+
 Los binarios usan `CGO_ENABLED=0` (completamente estáticos, sin dependencia de libc en el objetivo). Ejemplo de despliegue:
 
 ```bash
@@ -340,6 +348,8 @@ Probado con laboratorios automatizados en Docker (3 contenedores, 2 redes aislad
 ```
 Pivx/
 ├── Makefile                  # Compilación cruzada (linux/amd64, arm64, win/amd64)
+├── assets/                   # Logo y recursos visuales
+│   └── logo.svg
 ├── agent/                    # Agente Go
 │   ├── go.mod
 │   ├── main.go               # Transporte WS + control + descubrimiento (anti-uplink)
