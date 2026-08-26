@@ -16,7 +16,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 )
 
-require gvisor.dev/gvisor v0.0.0-20260825220317-3842c8232d20
+require gvisor.dev/gvisor v0.0.0-20260826025903-5083fc811497
 
 require (
 	github.com/google/btree v1.1.2 // indirect

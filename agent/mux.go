@@ -166,15 +166,23 @@ func (m *Mux) HandleControl(msg ControlMessage) bool {
 // handleServerOpen atiende un stream_open server->agent: marca hacia Dst y, si
 // conecta, hace de proxy; responde siempre con stream_open_ack.
 func (m *Mux) handleServerOpen(p StreamOpenPayload) {
-	conn, err := net.DialTimeout("tcp", p.Dst, muxDialTO)
+	host, port, err := net.SplitHostPort(p.Dst)
 	if err != nil {
-		log.Printf("[mux] destino inalcanzable %s: %v", p.Dst, err)
+		log.Printf("[mux] destino inválido %s: %v", p.Dst, err)
 		m.sendAck(p.StreamID, false, err.Error())
+		return
+	}
+	dst := net.JoinHostPort(rewriteMagicIP(host), port)
+
+	conn, dialErr := net.DialTimeout("tcp", dst, muxDialTO)
+	if dialErr != nil {
+		log.Printf("[mux] destino inalcanzable %s: %v", dst, dialErr)
+		m.sendAck(p.StreamID, false, dialErr.Error())
 		return
 	}
 	m.register(p.StreamID, conn)
 	m.sendAck(p.StreamID, true, "")
-	log.Printf("[mux] stream %d -> %s establecido", p.StreamID, p.Dst)
+	log.Printf("[mux] stream %d -> %s establecido (orig %s)", p.StreamID, dst, p.Dst)
 	go m.pump(p.StreamID, conn)
 }
 
