@@ -5,6 +5,7 @@
 ![DuckDB](https://img.shields.io/badge/DuckDB-1.0+-FFF000?logo=duckdb&logoColor=black)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL2-lightgrey)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 [English](README.md) | [Español](README_es.md) | [Português](README_pt.md) | [中文](README_zh.md)
 
@@ -371,3 +372,9 @@ nmap -sT 10.10.20.0/24          # Escaneo TCP connect (siempre funciona)
 ---
 
 > ⚠️ **Usar únicamente en sistemas propios o con autorización explícita por escrito.**
+
+---
+
+## 📄 Licencia
+
+Este proyecto está licenciado bajo la **Licencia Pública General de GNU v3.0**. Consulta el archivo [LICENSE](LICENSE) para el texto completo.
