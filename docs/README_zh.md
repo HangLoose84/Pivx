@@ -170,6 +170,24 @@ make windows-amd64   # -> dist/pivx-agent-windows-amd64.exe
 make clean           # 清除 ./dist
 ```
 
+#### UPX 压缩变体（更小的二进制文件）
+
+在 CTF 场景中，上传速度至关重要，UPX 压缩变体可将二进制文件大小缩减至原始大小的约 40%（约 3-4 MB vs 约 8 MB）。二进制文件在启动时会在内存中透明解压 —— 不影响运行性能。
+
+```bash
+make all-upx         # 构建全部 3 个平台 + 对应的 UPX 变体
+```
+
+单独的 UPX 构建目标：
+
+```bash
+make linux-amd64-upx   # -> dist/pivx-agent-linux-amd64-upx
+make linux-arm64-upx   # -> dist/pivx-agent-linux-arm64-upx
+make windows-amd64-upx # -> dist/pivx-agent-windows-amd64-upx.exe
+```
+
+> **提示：**默认使用 UPX 变体以加快上传速度。仅在杀毒软件标记 UPX 打包时才改用普通二进制文件。构建机器上需要安装 `upx`（`apt install upx` / `brew install upx`）。
+
 二进制文件使用 `CGO_ENABLED=0`（完全静态，目标机器无需 libc 依赖）。部署示例：
 
 ```bash

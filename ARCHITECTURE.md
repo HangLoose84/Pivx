@@ -16,7 +16,7 @@ cross-build. Multi-agente simultáneo y TLS/auth quedan para fases posteriores.
 
 | Componente | Lenguaje | Rol | Ubicación |
 |------------|----------|-----|-----------|
-| **Agente** | Go (binario estático) | Se ejecuta en el host comprometido (*target*). Túnel de transporte. | Red interna víctima |
+| **Agente** | Go (binario estático, opcionalmente UPX) | Se ejecuta en el host comprometido (*target*). Túnel de transporte. | Red interna víctima |
 | **Servidor C2** | Python (Streamlit + asyncio) | Interfaz del operador, gestión de agentes y rutas. | Máquina del atacante |
 | **Persistencia** | DuckDB (fichero local) | Estado de agentes y logs de conexión. | Junto al servidor |
 
@@ -175,6 +175,16 @@ la Fase 5.
   bytes de metadatos que el kernel antepondría, el primer byte que ve el agente
   es ya el nibble de versión IP (imprescindible para la discriminación L3/MUX).
 
+### 4.4 Variantes UPX (despliegue ligero)
+
+El `Makefile` ofrece targets `*-upx` que ejecutan `upx --best` sobre cada binario
+estático, produciendo una variante comprimida que ocupa ~40% del tamaño original
+(~3-4 MB vs ~8 MB). El binario UPX es autoextraíble: al lanzarse se descomprime
+en memoria de forma transparente, sin impacto en rendimiento ni dependencias
+adicionales. Es la opción recomendada cuando el ancho de banda al target es
+limitado (CTFs, conexiones inestables, exfiltración por canales estrechos). Si un
+antivirus en el target flagea la firma UPX, se recurre al binario normal.
+
 ---
 
 ## 4bis. Plano de streams: port-forwarding L4 y SOCKS5 L7 (Fase 3)
@@ -270,7 +280,7 @@ CREATE TABLE routes (
 | **1 — MVP base** | Estructura, WS control-plane, registro + ping, dashboard | ✅ |
 | **2 — Túnel de datos** | TUN en servidor, netstack gVisor en agente, framing texto/binario, rutas 1-clic | ✅ |
 | **2.5 — Estabilización** | Filtro anti-uplink, cierre TCP half-open, timeout de agentes (keep-alive) | ✅ |
-| **3 — Suite de pivoting** | Data-plane endurecido (MTU/backpressure), canal **MUX**, port-forwarding **L4** (local/remote), **SOCKS5** L7, `Makefile` de cross-build | ✅ |
+| **3 — Suite de pivoting** | Data-plane endurecido (MTU/backpressure), canal **MUX**, port-forwarding **L4** (local/remote), **SOCKS5** L7, `Makefile` de cross-build, variantes **UPX** | ✅ |
 | 4 — Endurecimiento | TLS/wss, auth de agentes, cifrado | ⬜ |
 | 5 — Multi-agente | Rutas automáticas al conectar, gestión de solapamientos, varios túneles simultáneos | ⬜ |
 

@@ -172,6 +172,24 @@ make windows-amd64   # -> dist/pivx-agent-windows-amd64.exe
 make clean           # Eliminar ./dist
 ```
 
+#### Variantes comprimidas con UPX (binarios más pequeños)
+
+Para escenarios CTF donde la velocidad de subida importa, las variantes comprimidas con UPX reducen el tamaño del binario a ~40% del original (~3-4 MB vs ~8 MB). El binario se descomprime de forma transparente en memoria al ejecutarse — sin impacto en rendimiento.
+
+```bash
+make all-upx         # Compilar las 3 plataformas + sus variantes UPX
+```
+
+Objetivos UPX individuales:
+
+```bash
+make linux-amd64-upx   # -> dist/pivx-agent-linux-amd64-upx
+make linux-arm64-upx   # -> dist/pivx-agent-linux-arm64-upx
+make windows-amd64-upx # -> dist/pivx-agent-windows-amd64-upx.exe
+```
+
+> **Consejo:** Usa la variante UPX por defecto para subidas más rápidas. Recurre al binario normal solo si un antivirus detecta el empaquetado UPX. Requiere `upx` instalado en la máquina de compilación (`apt install upx` / `brew install upx`).
+
 Los binarios usan `CGO_ENABLED=0` (completamente estáticos, sin dependencia de libc en el objetivo). Ejemplo de despliegue:
 
 ```bash

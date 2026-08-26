@@ -24,10 +24,15 @@ BIN       := pivx-agent
 GO_BUILD = cd $(AGENT_DIR) && CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) \
 	go build $(GOFLAGS) -ldflags="$(LDFLAGS)" -o ../$(DIST)/$(3) .
 
-.PHONY: all deps linux-amd64 linux-arm64 windows-amd64 clean
+.PHONY: all all-upx deps linux-amd64 linux-arm64 windows-amd64 \
+       linux-amd64-upx linux-arm64-upx windows-amd64-upx clean
 
 all: linux-amd64 linux-arm64 windows-amd64
 	@echo "Binarios en ./$(DIST):"
+	@ls -lh $(DIST) 2>/dev/null || true
+
+all-upx: all linux-amd64-upx linux-arm64-upx windows-amd64-upx
+	@echo "Binarios (normales + UPX) en ./$(DIST):"
 	@ls -lh $(DIST) 2>/dev/null || true
 
 # Obtiene la dependencia gVisor (no fijada en go.mod a proposito) y ordena modulos.
@@ -45,6 +50,15 @@ linux-arm64: | $(DIST)
 
 windows-amd64: | $(DIST)
 	$(call GO_BUILD,windows,amd64,$(BIN)-windows-amd64.exe)
+
+linux-amd64-upx: linux-amd64
+	upx --best $(DIST)/$(BIN)-linux-amd64 -o $(DIST)/$(BIN)-linux-amd64-upx
+
+linux-arm64-upx: linux-arm64
+	upx --best $(DIST)/$(BIN)-linux-arm64 -o $(DIST)/$(BIN)-linux-arm64-upx
+
+windows-amd64-upx: windows-amd64
+	upx --best $(DIST)/$(BIN)-windows-amd64.exe -o $(DIST)/$(BIN)-windows-amd64-upx.exe
 
 clean:
 	rm -rf $(DIST)
