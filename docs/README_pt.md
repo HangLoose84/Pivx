@@ -337,6 +337,9 @@ Pivx/
 │       ├── runtime.py        # Orquestração TUN <-> WebSocket (plano L3)
 │       ├── forward.py        # Camada MUX: port forwarding L4 + SOCKS5 (L4/L7)
 │       └── ws_server.py      # Listener WebSocket (controle + dados + demux L3/MUX)
+├── docker/                   # Configs de laboratório Docker (não rastreado)
+├── tests/                    # Scripts de testes de integração (não rastreado)
+├── docs/                     # Traduções (ES, PT, ZH) + tutoriais
 ├── ARCHITECTURE.md
 └── README.md
 ```

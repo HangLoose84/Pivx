@@ -1,6 +1,6 @@
 # Python
 server/.venv/
-__pycache__/
+**/__pycache__/
 *.pyc
 
 # DuckDB (estado local del C2)
@@ -13,6 +13,13 @@ agent/pivx-agent.exe
 /pivx-agent
 dist/
 *.exe
+
+# Docker / tests (archivos efímeros de laboratorio)
+docker/
+tests/
+
+# Scripts locales
+push.sh
 
 # Editor / SO
 .vscode/

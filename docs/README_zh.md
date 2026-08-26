@@ -335,6 +335,9 @@ Pivx/
 │       ├── runtime.py        # TUN <-> WebSocket 编排（L3 面）
 │       ├── forward.py        # MUX 层：L4 端口转发 + SOCKS5（L4/L7）
 │       └── ws_server.py      # WebSocket 监听器（控制 + 数据 + L3/MUX 分流）
+├── docker/                   # Docker 实验环境配置（未跟踪）
+├── tests/                    # 集成测试脚本（未跟踪）
+├── docs/                     # 翻译文档（ES、PT、ZH）+ 教程
 ├── ARCHITECTURE.md
 └── README.md
 ```
