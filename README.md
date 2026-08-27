@@ -107,6 +107,27 @@ From the C2 dashboard, one click sends `{"type":"kill"}` to the agent, which exe
 
 ## 🚀 Getting Started
 
+### Auto-Pilot CLI (recommended)
+
+One command to start the C2, wait for an agent, auto-configure SOCKS5 + tunnel + routes, scan the internal network, and drop into a proxied shell:
+
+```bash
+sudo server/venv/bin/python pivx-autopilot.py
+```
+
+The script will:
+1. Start the WebSocket listener on `ws://0.0.0.0:8765`
+2. Wait for an agent to connect (deploy one on the compromised host)
+3. Auto-start SOCKS5 (`127.0.0.1:1080`), tunnel (`pivx0`), and routes
+4. Scan all discovered subnets and show live hosts
+5. Open an interactive shell with pre-configured aliases:
+
+```bash
+pivx ~/Pivx $ pc curl http://10.10.20.5/         # proxychains shortcut
+pivx ~/Pivx $ pscan -p 22,80 10.10.20.0/24       # proxychains + nmap
+pivx ~/Pivx $ pscurl http://10.10.20.5/           # curl via SOCKS5
+```
+
 ### 1) Server (Python, Linux/WSL2)
 
 > **Note for Kali Linux and modern distros:** Python 3.11+ marks system packages as `externally-managed-environment` and blocks global `pip install`. Pivx uses a **virtual environment (`venv`)** to avoid this. The `install.sh` script creates it automatically.
@@ -347,6 +368,7 @@ Tested with automated Docker labs (3 containers, 2 isolated networks):
 ```
 Pivx/
 ├── Makefile                  # Cross-build (linux/amd64, arm64, win/amd64)
+├── pivx-autopilot.py         # Auto-Pilot CLI (one-command setup)
 ├── assets/                   # Logo and visual assets
 │   └── logo.svg
 ├── agent/                    # Go agent

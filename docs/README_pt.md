@@ -107,6 +107,27 @@ A partir do painel C2, um clique envia `{"type":"kill"}` para o agente, que exec
 
 ## 🚀 Início Rápido
 
+### Auto-Pilot CLI (recomendado)
+
+Um único comando para iniciar o C2, aguardar um agente, auto-configurar SOCKS5 + túnel + rotas, escanear a rede interna e abrir um shell proxificado:
+
+```bash
+sudo server/venv/bin/python pivx-autopilot.py
+```
+
+O script irá:
+1. Iniciar o listener WebSocket em `ws://0.0.0.0:8765`
+2. Aguardar a conexão de um agente (implante um na máquina comprometida)
+3. Iniciar automaticamente SOCKS5 (`127.0.0.1:1080`), túnel (`pivx0`) e rotas
+4. Escanear todas as sub-redes descobertas e mostrar hosts ativos
+5. Abrir um shell interativo com aliases pré-configurados:
+
+```bash
+pivx ~/Pivx $ pc curl http://10.10.20.5/         # atalho proxychains
+pivx ~/Pivx $ pscan -p 22,80 10.10.20.0/24       # proxychains + nmap
+pivx ~/Pivx $ pscurl http://10.10.20.5/           # curl via SOCKS5
+```
+
 ### 1) Servidor (Python, Linux/WSL2)
 
 > **Nota para Kali Linux e distribuições modernas:** Python 3.11+ marca pacotes do sistema como `externally-managed-environment` e bloqueia `pip install` global. O Pivx utiliza um **ambiente virtual (`venv`)** para evitar isso. O script `install.sh` o cria automaticamente.
@@ -347,6 +368,7 @@ Testado com laboratórios Docker automatizados (3 containers, 2 redes isoladas):
 ```
 Pivx/
 ├── Makefile                  # Cross-build (linux/amd64, arm64, win/amd64)
+├── pivx-autopilot.py         # Auto-Pilot CLI (setup em um comando)
 ├── assets/                   # Logo e recursos visuais
 │   └── logo.svg
 ├── agent/                    # Agente Go
