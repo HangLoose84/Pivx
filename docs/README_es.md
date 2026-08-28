@@ -20,7 +20,6 @@ port forwarding L4 y SOCKS5 L7** sobre una única conexión WebSocket con
 **latencia ultrabaja** — sin cabeceras de framing adicionales, sin conexiones secundarias.
 
 > **Estado actual (Fase 3):** suite completa de pivoting para CTF y pentesting.
-> Consulta [`ARCHITECTURE.md`](../ARCHITECTURE.md) para el diseño completo.
 
 ---
 
@@ -119,14 +118,22 @@ El script:
 1. Levanta el listener WebSocket en `ws://0.0.0.0:8765`
 2. Espera a que un agente se conecte (despliega uno en el host comprometido)
 3. Auto-inicia SOCKS5 (`127.0.0.1:1080`), túnel (`pivx0`) y rutas
-4. Escanea las subredes descubiertas y muestra los hosts activos
-5. Abre una shell interactiva con aliases preconfigurados:
+4. Ejecuta un **barrido ICMP (ping sweep)** en cada subred descubierta y muestra los hosts vivos en terminal:
+   ```
+   >>> [ALIVE] 20.20.20.2  (Pivot)
+   >>> [ALIVE] 20.20.20.5
+   >>> [ALIVE] 20.20.20.10
+   ```
+5. Abre una shell interactiva con el contexto del ataque en el prompt y aliases preconfigurados:
 
-```bash
-pivx ~/Pivx $ pc curl http://10.10.20.5/         # atajo proxychains
-pivx ~/Pivx $ pscan -p 22,80 10.10.20.0/24       # proxychains + nmap
-pivx ~/Pivx $ pscurl http://10.10.20.5/           # curl vía SOCKS5
 ```
+┌──(pivx)─[20.20.20.2]
+└─$ pc curl http://20.20.20.5/                    # atajo proxychains
+└─$ pscan -p 22,80 20.20.20.0/24                  # proxychains + nmap
+└─$ pscurl http://20.20.20.5/                     # curl vía SOCKS5
+```
+
+> **Tip:** Mientras el Auto-Pilot CLI está en ejecución, puedes abrir el dashboard web en `http://localhost:8501` para monitorización en tiempo real. El dashboard abre la base de datos en modo **Solo Lectura** automáticamente, sin conflictos de bloqueo.
 
 ### 1) Servidor (Python, Linux/WSL2)
 
@@ -389,7 +396,6 @@ Pivx/
 ├── docker/                   # Configs de laboratorio Docker (no trackeado)
 ├── tests/                    # Scripts de tests de integración (no trackeado)
 ├── docs/                     # Traducciones (ES, PT, ZH) + tutoriales
-├── ARCHITECTURE.md
 └── README.md
 ```
 

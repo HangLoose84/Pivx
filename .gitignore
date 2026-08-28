@@ -18,6 +18,9 @@ dist/
 docker/
 tests/
 
+# Documentación interna (OPSEC)
+ARCHITECTURE.md
+
 # Scripts locales
 push.sh
 

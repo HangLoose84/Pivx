@@ -92,4 +92,32 @@ Si notas que los administradores de la red te están rastreando, presiona el bot
 
 ---
 
+## 🤖 Modo Auto-Pilot (Avanzado)
+
+Si prefieres la terminal al panel web, el **Auto-Pilot CLI** hace todo en un solo comando:
+
+```bash
+sudo server/venv/bin/python pivx-autopilot.py
+```
+
+Automáticamente:
+- Arranca el C2 y espera un agente
+- Configura SOCKS5, túnel y rutas
+- Ejecuta un **barrido ICMP (ping sweep)** mostrando las máquinas vivas en la red interna:
+  ```
+  >>> [ALIVE] 20.20.20.2  (Pivot)
+  >>> [ALIVE] 20.20.20.5
+  ```
+- Abre una shell proxificada con la IP del agente en el prompt:
+  ```
+  ┌──(pivx)─[20.20.20.2]
+  └─$
+  ```
+
+### 📊 Dashboard de Monitorización (Solo Lectura)
+
+Mientras usas el Auto-Pilot CLI, puedes abrir el dashboard web en `http://localhost:8501` para monitorización en tiempo real. Abre la base de datos en modo **Solo Lectura** automáticamente — sin conflictos, sin caídas.
+
+---
+
 > ⚠️ **Usar únicamente en sistemas propios o con autorización explícita por escrito.**

@@ -2,11 +2,13 @@
 """Pivx Auto-Pilot CLI.
 
 Arranca el C2, espera un agente, configura SOCKS5 + tunel + rutas
-automaticamente, escanea la red interna y abre una shell proxificada.
+automaticamente, ejecuta un ping sweep para descubrir hosts vivos,
+y abre una shell proxificada.
 
 Uso:  sudo server/venv/bin/python pivx-autopilot.py
 """
 
+import ipaddress
 import json
 import os
 import shutil
@@ -14,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
@@ -35,10 +38,10 @@ RESET = "\033[0m"
 
 def banner():
     print(f"""
-{RED}  ╔══════════════════════════════════════════════╗
-  ║{RESET}{BOLD}          PIVX — Auto-Pilot CLI              {RESET}{RED}║
-  ║{RESET}{DIM}   Hybrid Framing C2 & Pivoting Suite       {RESET}{RED}║
-  ╚══════════════════════════════════════════════╝{RESET}
+{RED}  +=============================================+
+  |{RESET}{BOLD}          PIVX -- Auto-Pilot CLI              {RESET}{RED}|
+  |{RESET}{DIM}   Hybrid Framing C2 & Pivoting Suite       {RESET}{RED}|
+  +=============================================+{RESET}
 """)
 
 
@@ -59,7 +62,7 @@ def error(msg):
 
 
 def separator():
-    print(f"  {DIM}{'─' * 50}{RESET}")
+    print(f"  {DIM}{'=' * 50}{RESET}")
 
 
 def wait_for_agent(timeout=300):
@@ -71,7 +74,7 @@ def wait_for_agent(timeout=300):
     separator()
     print()
 
-    spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    spinner = "|/-\\"
     start = time.time()
     idx = 0
 
@@ -82,13 +85,14 @@ def wait_for_agent(timeout=300):
             if not online.empty:
                 agent = online.iloc[0]
                 agent_id = agent["agent_id"]
+                remote_addr = agent.get("remote_addr", "?")
                 print("\r" + " " * 60 + "\r", end="")
                 step("Agente conectado!")
                 print()
                 info(f"  ID:       {agent_id[:16]}...")
                 info(f"  Host:     {agent['hostname']}")
                 info(f"  OS/Arch:  {agent.get('os', '?')}/{agent.get('arch', '?')}")
-                info(f"  Remote:   {agent.get('remote_addr', '?')}")
+                info(f"  Remote:   {remote_addr}")
 
                 subnets = []
                 ifaces = db.get_agent_interfaces(agent_id)
@@ -97,7 +101,7 @@ def wait_for_agent(timeout=300):
                         info(f"  Red:      {iface.get('name', '?')} -> {cidr}")
                         subnets.append(cidr)
                 print()
-                return agent_id, subnets
+                return agent_id, subnets, remote_addr
 
         c = spinner[idx % len(spinner)]
         elapsed = int(time.time() - start)
@@ -144,6 +148,89 @@ def auto_setup(agent_id, subnets):
     return tunnel_ok
 
 
+def _ping_host(ip, timeout=1):
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", str(timeout), str(ip)],
+            capture_output=True, timeout=timeout + 2,
+        )
+        return str(ip), result.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return str(ip), False
+
+
+def ping_sweep(subnets, tunnel_ok):
+    if not subnets:
+        warn("No se descubrieron subredes")
+        return
+
+    separator()
+    print()
+    step("Ping Sweep - Descubrimiento de hosts")
+    print()
+
+    if not tunnel_ok:
+        warn("Tunel L3 inactivo: el ping sweep requiere el tunel para ICMP directo")
+        info("Usa 'pscan' desde la shell proxificada para escaneo TCP via SOCKS5")
+        print()
+        return
+
+    for cidr in subnets:
+        try:
+            network = ipaddress.ip_interface(cidr).network
+        except ValueError:
+            warn(f"CIDR invalido: {cidr}")
+            continue
+
+        hosts = list(network.hosts())
+        if len(hosts) > 1024:
+            warn(f"Red {network} demasiado grande ({len(hosts)} hosts), limitando a /22")
+            hosts = hosts[:1022]
+
+        info(f"Escaneando {BOLD}{network}{RESET} ({len(hosts)} hosts)...")
+        print()
+
+        alive = []
+        dead_count = 0
+        workers = min(50, len(hosts))
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_ping_host, ip): ip for ip in hosts}
+            done = 0
+            for future in as_completed(futures):
+                done += 1
+                ip_str, is_alive = future.result()
+                if is_alive:
+                    alive.append(ip_str)
+                else:
+                    dead_count += 1
+                pct = int(done * 100 / len(hosts))
+                bar_filled = pct // 5
+                bar = f"[{'#' * bar_filled}{'.' * (20 - bar_filled)}]"
+                print(f"\r  {bar} {pct}% ({done}/{len(hosts)})", end="", flush=True)
+
+        print("\r" + " " * 60 + "\r", end="")
+
+        if alive:
+            alive.sort(key=lambda x: ipaddress.ip_address(x))
+            separator()
+            print()
+            step(f"Hosts vivos en {BOLD}{network}{RESET}: {len(alive)}")
+            print()
+            for ip in alive:
+                tag = "Pivot" if any(ip in cidr for cidr in subnets) else ""
+                if tag:
+                    print(f"    {GREEN}>>>{RESET} {BOLD}[ALIVE]{RESET} {ip}  {DIM}({tag}){RESET}")
+                else:
+                    print(f"    {GREEN}>>>{RESET} {BOLD}[ALIVE]{RESET} {ip}")
+            print()
+            info(f"  No responden: {dead_count}")
+        else:
+            warn(f"Ningun host respondio en {network}")
+
+        print()
+
+
 def create_proxychains_conf():
     fd, path = tempfile.mkstemp(prefix="pivx_pc_", suffix=".conf")
     with os.fdopen(fd, "w") as f:
@@ -157,37 +244,37 @@ def create_proxychains_conf():
 
 def scan_network(subnets, tunnel_ok):
     if not subnets:
-        warn("No se descubrieron subredes")
+        return
+
+    has_nmap = shutil.which("nmap") is not None
+    if not has_nmap:
         return
 
     separator()
     print()
-    step("Escaneando redes internas...")
+    step("Escaneo de puertos (nmap)")
     print()
-
-    has_nmap = shutil.which("nmap") is not None
-
-    if not has_nmap:
-        warn("nmap no encontrado — escaneo omitido")
-        info("Instala con: sudo apt install nmap")
-        print()
-        return
 
     pc_conf = create_proxychains_conf()
     pc_bin = shutil.which("proxychains4") or shutil.which("proxychains")
 
     for cidr in subnets:
-        info(f"Escaneando {BOLD}{cidr}{RESET}...")
+        try:
+            network = ipaddress.ip_interface(cidr).network
+        except ValueError:
+            continue
+
+        info(f"Escaneando {BOLD}{network}{RESET}...")
         print()
 
         if tunnel_ok:
-            cmd = ["nmap", "-sn", "--min-rate", "300", "-T4", cidr]
+            cmd = ["nmap", "-sn", "--min-rate", "300", "-T4", str(network)]
         elif pc_bin:
             cmd = [pc_bin, "-f", pc_conf, "nmap", "-sT", "-Pn",
                    "-p", "22,80,443,445,3306,8080,8443", "--open",
-                   "--min-rate", "100", cidr]
+                   "--min-rate", "100", str(network)]
         else:
-            warn("proxychains no encontrado y tunel inactivo — escaneo omitido")
+            warn("proxychains no encontrado y tunel inactivo")
             continue
 
         info(f"$ {' '.join(cmd)}")
@@ -195,7 +282,7 @@ def scan_network(subnets, tunnel_ok):
         try:
             subprocess.run(cmd, timeout=180)
         except subprocess.TimeoutExpired:
-            warn(f"Escaneo de {cidr} timeout (180s)")
+            warn(f"Escaneo de {network} timeout (180s)")
         except KeyboardInterrupt:
             warn("Escaneo interrumpido")
         print()
@@ -206,7 +293,7 @@ def scan_network(subnets, tunnel_ok):
         pass
 
 
-def interactive_shell():
+def interactive_shell(agent_addr):
     separator()
     print()
     step("Shell proxificada lista")
@@ -226,10 +313,12 @@ def interactive_shell():
     pc_conf = create_proxychains_conf()
     pc_bin = shutil.which("proxychains4") or shutil.which("proxychains") or "proxychains"
 
+    agent_ip = agent_addr.split(":")[0] if agent_addr and agent_addr != "?" else "unknown"
+
     rcfile_fd, rcfile = tempfile.mkstemp(prefix="pivx_rc_", suffix=".sh")
     with os.fdopen(rcfile_fd, "w") as f:
         f.write("[ -f ~/.bashrc ] && source ~/.bashrc 2>/dev/null\n")
-        f.write(f'export PS1="\\[\\033[91m\\]pivx\\[\\033[0m\\] \\[\\033[96m\\]\\w\\[\\033[0m\\] $ "\n')
+        f.write(f'export PS1="\\[\\033[91m\\]\\n\\342\\224\\214\\342\\224\\200\\342\\224\\200(pivx)\\342\\224\\200[{agent_ip}]\\n\\342\\224\\224\\342\\224\\200\\$\\[\\033[0m\\] "\n')
         f.write(f'export ALL_PROXY="socks5://{SOCKS_HOST}:{SOCKS_PORT}"\n')
         f.write(f'export PROXYCHAINS_CONF_FILE="{pc_conf}"\n')
         f.write(f'alias pc="{pc_bin} -f {pc_conf}"\n')
@@ -286,10 +375,10 @@ def main():
     time.sleep(0.5)
     print()
 
-    agent_id, subnets = wait_for_agent()
+    agent_id, subnets, agent_addr = wait_for_agent()
     tunnel_ok = auto_setup(agent_id, subnets)
-    scan_network(subnets, tunnel_ok)
-    interactive_shell()
+    ping_sweep(subnets, tunnel_ok)
+    interactive_shell(agent_addr)
     cleanup()
 
 

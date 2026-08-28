@@ -18,7 +18,6 @@
 Pivx 采用**混合帧（Hybrid Framing）**架构，在单条 WebSocket 连接上复用 **L3 隧道、L4 端口转发和 L7 SOCKS5**，实现**超低延迟** —— 无额外帧头开销，无需建立辅助连接。
 
 > **当前状态（Phase 3）：**完整的跳板套件，适用于 CTF 和渗透测试。
-> 完整设计详见 [`ARCHITECTURE.md`](../ARCHITECTURE.md)。
 
 ---
 
@@ -117,14 +116,22 @@ sudo server/venv/bin/python pivx-autopilot.py
 1. 在 `ws://0.0.0.0:8765` 上启动 WebSocket 监听器
 2. 等待 Agent 连接（在被攻陷主机上部署 Agent）
 3. 自动启动 SOCKS5（`127.0.0.1:1080`）、隧道（`pivx0`）和路由
-4. 扫描所有已发现的子网并显示存活主机
-5. 打开带有预配置别名的交互式 Shell：
+4. 对每个发现的子网执行 **ICMP Ping Sweep**，在终端中显示存活主机：
+   ```
+   >>> [ALIVE] 20.20.20.2  (Pivot)
+   >>> [ALIVE] 20.20.20.5
+   >>> [ALIVE] 20.20.20.10
+   ```
+5. 打开交互式 Shell，提示符显示攻击上下文，并预配置别名：
 
-```bash
-pivx ~/Pivx $ pc curl http://10.10.20.5/         # proxychains 快捷方式
-pivx ~/Pivx $ pscan -p 22,80 10.10.20.0/24       # proxychains + nmap
-pivx ~/Pivx $ pscurl http://10.10.20.5/           # curl 通过 SOCKS5
 ```
+┌──(pivx)─[20.20.20.2]
+└─$ pc curl http://20.20.20.5/                    # proxychains 快捷方式
+└─$ pscan -p 22,80 20.20.20.0/24                  # proxychains + nmap
+└─$ pscurl http://20.20.20.5/                     # curl 通过 SOCKS5
+```
+
+> **提示：**Auto-Pilot CLI 运行时，你仍可以在 `http://localhost:8501` 打开 Web 控制面板进行实时监控。面板会自动以**只读模式**打开数据库，不会产生锁冲突。
 
 ### 1) 服务端（Python，Linux/WSL2）
 
@@ -387,7 +394,6 @@ Pivx/
 ├── docker/                   # Docker 实验环境配置（未跟踪）
 ├── tests/                    # 集成测试脚本（未跟踪）
 ├── docs/                     # 翻译文档（ES、PT、ZH）+ 教程
-├── ARCHITECTURE.md
 └── README.md
 ```
 

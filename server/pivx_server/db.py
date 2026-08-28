@@ -3,9 +3,9 @@
 Guarda el estado de los agentes, las subredes descubiertas, un log de eventos y
 las rutas instaladas.
 
-NOTA de concurrencia: una unica conexion DuckDB es compartida por el hilo del
-servidor WebSocket (escrituras) y por el hilo principal de Streamlit (lecturas).
-Todas las operaciones se serializan con un lock global.
+NOTA de concurrencia: DuckDB solo permite un proceso con escritura a la vez.
+Si el Auto-Pilot ya tiene el lock, Streamlit abre la BD en modo read_only
+para funcionar como monitor sin colisionar.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ DB_PATH = Path(__file__).resolve().parent.parent / "pivx.duckdb"
 
 _lock = threading.Lock()
 _conn: duckdb.DuckDBPyConnection | None = None
+_read_only: bool = False
 
 
 def _now() -> datetime:
@@ -29,12 +30,22 @@ def _now() -> datetime:
 
 
 def get_connection() -> duckdb.DuckDBPyConnection:
-    global _conn
+    global _conn, _read_only
     with _lock:
         if _conn is None:
-            _conn = duckdb.connect(str(DB_PATH))
-            _init_schema(_conn)
+            try:
+                _conn = duckdb.connect(str(DB_PATH))
+                _read_only = False
+            except duckdb.IOException:
+                _conn = duckdb.connect(str(DB_PATH), read_only=True)
+                _read_only = True
+            if not _read_only:
+                _init_schema(_conn)
         return _conn
+
+
+def is_read_only() -> bool:
+    return _read_only
 
 
 def _init_schema(conn: duckdb.DuckDBPyConnection) -> None:
@@ -82,6 +93,8 @@ def _init_schema(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def log_event(agent_id: str, event: str, detail: str = "") -> None:
+    if _read_only:
+        return
     conn = get_connection()
     with _lock:
         conn.execute(
@@ -99,6 +112,8 @@ def register_agent(
     remote_addr: str,
     interfaces: list | None = None,
 ) -> None:
+    if _read_only:
+        return
     conn = get_connection()
     now = _now()
     ifaces_json = json.dumps(interfaces or [])
@@ -129,6 +144,8 @@ def register_agent(
 
 
 def touch_agent(agent_id: str) -> None:
+    if _read_only:
+        return
     conn = get_connection()
     with _lock:
         conn.execute(
@@ -138,6 +155,8 @@ def touch_agent(agent_id: str) -> None:
 
 
 def mark_offline(agent_id: str) -> None:
+    if _read_only:
+        return
     conn = get_connection()
     with _lock:
         conn.execute(
@@ -155,6 +174,8 @@ def mark_stale_offline(timeout_seconds: float) -> list[str]:
     Se ejecuta desde un barrido periodico del servidor WebSocket. Es seguro
     llamarla desde cualquier hilo: toda la operacion se serializa con `_lock`.
     """
+    if _read_only:
+        return []
     conn = get_connection()
     cutoff = _now() - timedelta(seconds=timeout_seconds)
     with _lock:
@@ -201,6 +222,8 @@ def get_logs_df(limit: int = 200) -> pd.DataFrame:
 # --- rutas ----------------------------------------------------------------
 
 def add_route(cidr: str, agent_id: str) -> None:
+    if _read_only:
+        return
     conn = get_connection()
     with _lock:
         conn.execute("DELETE FROM routes WHERE cidr = ?", [cidr])
@@ -211,6 +234,8 @@ def add_route(cidr: str, agent_id: str) -> None:
 
 
 def remove_route(cidr: str) -> None:
+    if _read_only:
+        return
     conn = get_connection()
     with _lock:
         conn.execute("UPDATE routes SET status = 'removed' WHERE cidr = ?", [cidr])

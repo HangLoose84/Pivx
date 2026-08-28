@@ -20,7 +20,6 @@ L4 port forwarding, and L7 SOCKS5** over a single WebSocket connection with
 **ultra-low latency** — no extra framing headers, no secondary connections.
 
 > **Current status (Phase 3):** full pivoting suite for CTF and pentesting.
-> See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete design.
 
 ---
 
@@ -119,14 +118,22 @@ The script will:
 1. Start the WebSocket listener on `ws://0.0.0.0:8765`
 2. Wait for an agent to connect (deploy one on the compromised host)
 3. Auto-start SOCKS5 (`127.0.0.1:1080`), tunnel (`pivx0`), and routes
-4. Scan all discovered subnets and show live hosts
-5. Open an interactive shell with pre-configured aliases:
+4. Run an **ICMP ping sweep** on each discovered subnet and display live hosts in the terminal:
+   ```
+   >>> [ALIVE] 20.20.20.2  (Pivot)
+   >>> [ALIVE] 20.20.20.5
+   >>> [ALIVE] 20.20.20.10
+   ```
+5. Open an interactive shell with the attack context in the prompt and pre-configured aliases:
 
-```bash
-pivx ~/Pivx $ pc curl http://10.10.20.5/         # proxychains shortcut
-pivx ~/Pivx $ pscan -p 22,80 10.10.20.0/24       # proxychains + nmap
-pivx ~/Pivx $ pscurl http://10.10.20.5/           # curl via SOCKS5
 ```
+┌──(pivx)─[20.20.20.2]
+└─$ pc curl http://20.20.20.5/                    # proxychains shortcut
+└─$ pscan -p 22,80 20.20.20.0/24                  # proxychains + nmap
+└─$ pscurl http://20.20.20.5/                     # curl via SOCKS5
+```
+
+> **Tip:** While the Auto-Pilot CLI is running, you can still open the web dashboard at `http://localhost:8501` for real-time monitoring. The dashboard opens the database in **Read-Only** mode automatically, so there are no lock conflicts.
 
 ### 1) Server (Python, Linux/WSL2)
 
@@ -389,7 +396,6 @@ Pivx/
 ├── docker/                   # Docker lab configs (not tracked)
 ├── tests/                    # Integration test scripts (not tracked)
 ├── docs/                     # Translations (ES, PT, ZH) + tutorials
-├── ARCHITECTURE.md
 └── README.md
 ```
 

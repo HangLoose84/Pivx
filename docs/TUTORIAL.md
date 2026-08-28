@@ -92,4 +92,32 @@ If you notice the network administrators are tracking you, press the red **"Kill
 
 ---
 
+## 🤖 Auto-Pilot Mode (Advanced)
+
+If you prefer the terminal over the web panel, the **Auto-Pilot CLI** does everything in one command:
+
+```bash
+sudo server/venv/bin/python pivx-autopilot.py
+```
+
+It automatically:
+- Starts the C2 and waits for an agent
+- Configures SOCKS5, tunnel, and routes
+- Runs an **ICMP ping sweep** showing live machines on the internal network:
+  ```
+  >>> [ALIVE] 20.20.20.2  (Pivot)
+  >>> [ALIVE] 20.20.20.5
+  ```
+- Opens a proxied shell with the agent's IP in the prompt:
+  ```
+  ┌──(pivx)─[20.20.20.2]
+  └─$
+  ```
+
+### 📊 Monitoring Dashboard (Read-Only)
+
+While using the Auto-Pilot CLI, you can open the web dashboard at `http://localhost:8501` for real-time monitoring. It opens the database in **Read-Only** mode automatically — no conflicts, no crashes.
+
+---
+
 > ⚠️ **Use only on systems you own or with explicit written authorization.**

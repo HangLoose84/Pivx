@@ -47,6 +47,8 @@ st_autorefresh(interval=3000, key="pivx_refresh")
 
 # --- Cabecera -------------------------------------------------------------
 st.title("🕸️ Pivx — Consola C2")
+if db.is_read_only():
+    st.warning("📖 Modo Solo Lectura — la BD está bloqueada por el Auto-Pilot CLI")
 st.caption(
     f"Listener WebSocket en `ws://{ws_server.DEFAULT_HOST}:{ws_server.DEFAULT_PORT}` "
     f"· estado: **{boot_status}**"

@@ -92,4 +92,32 @@ curl --socks5-hostname 127.0.0.1:1080 http://240.0.0.1:8080/
 
 ---
 
+## 🤖 Auto-Pilot 模式（进阶）
+
+如果你更喜欢终端而非 Web 面板，**Auto-Pilot CLI** 可以一条命令完成所有操作：
+
+```bash
+sudo server/venv/bin/python pivx-autopilot.py
+```
+
+自动完成以下操作：
+- 启动 C2 并等待 Agent 连接
+- 配置 SOCKS5、隧道和路由
+- 执行 **ICMP Ping Sweep**，显示内部网络中的存活主机：
+  ```
+  >>> [ALIVE] 20.20.20.2  (Pivot)
+  >>> [ALIVE] 20.20.20.5
+  ```
+- 打开代理化 Shell，提示符中显示 Agent 的 IP：
+  ```
+  ┌──(pivx)─[20.20.20.2]
+  └─$
+  ```
+
+### 📊 监控面板（只读模式）
+
+使用 Auto-Pilot CLI 时，你仍可以在 `http://localhost:8501` 打开 Web 控制面板进行实时监控。面板会自动以**只读模式**打开数据库 —— 不会产生冲突，不会崩溃。
+
+---
+
 > ⚠️ **仅限在你拥有或获得明确书面授权的系统上使用。**
