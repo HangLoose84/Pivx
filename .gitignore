@@ -3,9 +3,10 @@ server/.venv/
 **/__pycache__/
 *.pyc
 
-# DuckDB (estado local del C2)
-*.duckdb
-*.duckdb.wal
+# SQLite (estado local del C2)
+*.db
+*.db-wal
+*.db-shm
 
 # Go / build output
 agent/pivx-agent

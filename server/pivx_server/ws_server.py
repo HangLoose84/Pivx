@@ -108,12 +108,7 @@ async def _handle_agent(websocket) -> None:
 
 
 async def _keepalive_sweep() -> None:
-    """Barre periodicamente agentes sin pings recientes y los marca offline.
-
-    La escritura en DuckDB se delega a un hilo del executor para no bloquear el
-    event loop (que tambien bombea los paquetes del plano de datos). DuckDB
-    serializa el acceso con su propio lock, asi que es seguro desde el executor.
-    """
+    """Barre periodicamente agentes sin pings recientes y los marca offline."""
     loop = asyncio.get_running_loop()
     while True:
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
@@ -141,6 +136,8 @@ async def _serve(host: str, port: int) -> None:
     runtime.set_loop(loop)
     forward.set_loop(loop)
     db.get_connection()
+    db.mark_all_offline()
+    log.info("Agentes fantasma marcados offline al arrancar")
     sweep = asyncio.create_task(_keepalive_sweep())
     # max_size=None: no limitar el tamano de frame (paquetes del plano de datos).
     try:

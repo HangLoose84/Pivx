@@ -114,6 +114,52 @@ def wait_for_agent(timeout=300):
     sys.exit(1)
 
 
+def _route_exists(cidr):
+    try:
+        r = subprocess.run(
+            ["ip", "route", "show", cidr],
+            capture_output=True, text=True, timeout=5,
+        )
+        return bool(r.stdout.strip())
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def _setup_iptables_nat():
+    cmds = [
+        ["sysctl", "-w", "net.ipv4.ip_forward=1"],
+        ["iptables", "-t", "nat", "-C", "POSTROUTING", "-o", "pivx0", "-j", "MASQUERADE"],
+    ]
+    subprocess.run(cmds[0], capture_output=True, timeout=5)
+
+    check = subprocess.run(cmds[1], capture_output=True, timeout=5)
+    if check.returncode != 0:
+        subprocess.run(
+            ["iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "pivx0", "-j", "MASQUERADE"],
+            capture_output=True, timeout=5,
+        )
+
+    subprocess.run(
+        ["iptables", "-A", "FORWARD", "-i", "pivx0", "-j", "ACCEPT"],
+        capture_output=True, timeout=5,
+    )
+    subprocess.run(
+        ["iptables", "-A", "FORWARD", "-o", "pivx0", "-m", "state",
+         "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+        capture_output=True, timeout=5,
+    )
+
+
+def _cleanup_iptables_nat():
+    for cmd in [
+        ["iptables", "-t", "nat", "-D", "POSTROUTING", "-o", "pivx0", "-j", "MASQUERADE"],
+        ["iptables", "-D", "FORWARD", "-i", "pivx0", "-j", "ACCEPT"],
+        ["iptables", "-D", "FORWARD", "-o", "pivx0", "-m", "state",
+         "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+    ]:
+        subprocess.run(cmd, capture_output=True, timeout=5)
+
+
 def auto_setup(agent_id, subnets):
     separator()
     print()
@@ -133,12 +179,28 @@ def auto_setup(agent_id, subnets):
             runtime.activate_tunnel(agent_id)
             step("Tunel activo")
             tunnel_ok = True
+
             for cidr in subnets:
                 try:
-                    runtime.add_route(cidr)
-                    step(f"Ruta: {cidr} -> pivx0")
+                    net = ipaddress.ip_interface(cidr).network
+                    cidr_norm = str(net)
+                    if _route_exists(cidr_norm):
+                        info(f"Ruta ya existe: {cidr_norm} (omitida)")
+                    else:
+                        runtime.add_route(cidr_norm)
+                        step(f"Ruta: {cidr_norm} -> pivx0")
+                except subprocess.CalledProcessError as e:
+                    warn(f"Ruta {cidr} fallo (exit {e.returncode}): {e.stderr or e}")
                 except Exception as e:
                     warn(f"Ruta {cidr} fallo: {e}")
+
+            step("Configurando NAT/forwarding para pivx0...")
+            try:
+                _setup_iptables_nat()
+                step("ip_forward + iptables MASQUERADE activos")
+            except Exception as e:
+                warn(f"iptables fallo: {e} (ICMP/nmap directo puede no funcionar)")
+
         except Exception as e:
             warn(f"Tunel fallo: {e} (continuando con SOCKS5)")
     else:
@@ -344,6 +406,11 @@ def cleanup():
     try:
         forward.stop_socks_sync()
         step("SOCKS5 detenido")
+    except Exception:
+        pass
+    try:
+        _cleanup_iptables_nat()
+        step("Reglas iptables removidas")
     except Exception:
         pass
     try:
